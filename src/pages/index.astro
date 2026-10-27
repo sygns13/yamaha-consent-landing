@@ -8,65 +8,74 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 ---
 
 <BaseLayout title="Autorización de datos | Yamaha">
-  <div id="loading" role="status" class="flex flex-col items-center gap-3 py-16 text-slate-600 noscript:hidden">
-    <svg aria-hidden="true" class="size-8 text-brand motion-safe:animate-spin" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.25" stroke-width="3"></circle>
-      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
-    </svg>
-    <p>Cargando...</p>
-  </div>
-
-  <noscript>
-    <Alert>
-      <p>Para continuar, activa JavaScript en tu navegador.</p>
-    </Alert>
-  </noscript>
-
-  <Alert id="load-error" hidden>
-    <p>No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.</p>
-    <button
-      id="retry-button"
-      type="button"
-      class="rounded-sm font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
-    >
-      Reintentar
-    </button>
-  </Alert>
-
-  <section id="consent" hidden class="sm:rounded-xl sm:bg-white sm:p-8 sm:shadow-sm">
+  <section class="sm:rounded-xl sm:bg-white sm:p-8 sm:shadow-sm">
+    <!-- Etiqueta y título siempre visibles: la página tiene su <h1> también mientras carga o si falla la carga. -->
     <p class="text-xs font-semibold uppercase tracking-wider text-brand">Autorización de datos</p>
     <h1 class="mt-2 text-3xl font-bold leading-tight text-slate-900">Tu privacidad es importante</h1>
-    <p class="mt-3 leading-relaxed text-slate-600">
-      Antes de continuar, revisa la política de privacidad y selecciona las autorizaciones que deseas otorgar.
-    </p>
 
-    <hr class="my-6 border-slate-200" />
+    <!-- Región en vivo de los estados de carga: nunca se oculta; se muestra u oculta su contenido. -->
+    <div role="status" aria-live="polite">
+      <div id="loading" class="flex flex-col items-center gap-3 py-12 text-slate-600 noscript:hidden">
+        <svg aria-hidden="true" class="size-8 text-brand motion-safe:animate-spin" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.25" stroke-width="3"></circle>
+          <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+        </svg>
+        <p>Cargando...</p>
+      </div>
+      <!-- El cambio de texto del botón no se anuncia: el script escribe aquí "Enviando..." mientras se envía. -->
+      <p id="submit-status" class="sr-only"></p>
+    </div>
 
-    <!--
-      RN-01 (PENDIENTE-01 y PENDIENTE-17, sección 11): sin la nota "* Autorización obligatoria para continuar" ni
-      asterisco en el check 1. Los checks nacen desmarcados y ENVIAR está siempre habilitado: se puede enviar con
-      cualquier combinación, incluso con todo desmarcado.
-    -->
-    <form id="consent-form" novalidate>
-      <fieldset id="consent-fields" class="space-y-6">
-        <legend class="sr-only">Autorizaciones</legend>
-        <ConsentCheckbox name="personal_data">Acepto la</ConsentCheckbox>
-        <ConsentCheckbox name="marketing_yamaha" suffix=".">
-          Autorizo a <strong>YAMAHA</strong> para el tratamiento de mis datos personales con fines de perfilamiento y
-          envío de publicidad, de acuerdo con la
-        </ConsentCheckbox>
-        <ConsentCheckbox name="marketing_dealer" suffix=".">
-          Autorizo al <strong data-dealer-name>DEALER</strong> para el tratamiento de mis datos personales con fines
-          de perfilamiento y envío de publicidad, de acuerdo con la
-        </ConsentCheckbox>
-      </fieldset>
-
-      <Alert id="submit-error" hidden class="mt-8">
-        <p>No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.</p>
+    <noscript>
+      <Alert class="mt-6">
+        <p>Para continuar, activa JavaScript en tu navegador.</p>
       </Alert>
+    </noscript>
 
-      <PrimaryButton id="submit-button" class="mt-8">ENVIAR</PrimaryButton>
-    </form>
+    <Alert id="load-error" hidden class="mt-6">
+      <p>No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.</p>
+      <button
+        id="retry-button"
+        type="button"
+        class="rounded-sm font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
+      >
+        Reintentar
+      </button>
+    </Alert>
+
+    <div id="consent" hidden>
+      <p class="mt-3 leading-relaxed text-slate-600">
+        Antes de continuar, revisa la política de privacidad y selecciona las autorizaciones que deseas otorgar.
+      </p>
+
+      <hr class="my-6 border-slate-200" />
+
+      <!--
+        RN-01 (PENDIENTE-01 y PENDIENTE-17, sección 11): sin la nota "* Autorización obligatoria para continuar" ni
+        asterisco en el check 1. Los checks nacen desmarcados y ENVIAR está siempre habilitado: se puede enviar con
+        cualquier combinación, incluso con todo desmarcado.
+      -->
+      <form id="consent-form" novalidate>
+        <fieldset id="consent-fields" class="space-y-6">
+          <legend class="sr-only">Autorizaciones</legend>
+          <ConsentCheckbox name="personal_data">Acepto la</ConsentCheckbox>
+          <ConsentCheckbox name="marketing_yamaha" suffix=".">
+            Autorizo a <strong>YAMAHA</strong> para el tratamiento de mis datos personales con fines de perfilamiento
+            y envío de publicidad, de acuerdo con la
+          </ConsentCheckbox>
+          <ConsentCheckbox name="marketing_dealer" suffix=".">
+            Autorizo al <strong data-dealer-name>DEALER</strong> para el tratamiento de mis datos personales con
+            fines de perfilamiento y envío de publicidad, de acuerdo con la
+          </ConsentCheckbox>
+        </fieldset>
+
+        <Alert id="submit-error" hidden class="mt-8">
+          <p>No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.</p>
+        </Alert>
+
+        <PrimaryButton id="submit-button" class="mt-8">ENVIAR</PrimaryButton>
+      </form>
+    </div>
   </section>
 </BaseLayout>
 
@@ -87,6 +96,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
   const fields = document.getElementById("consent-fields") as HTMLFieldSetElement;
   const submitButton = document.getElementById("submit-button") as HTMLButtonElement;
   const submitError = document.getElementById("submit-error")!;
+  const submitStatus = document.getElementById("submit-status")!;
 
   /** replace(): el botón Atrás no vuelve a esta página. */
   function goToInvalidLink(reason: string): void {
@@ -156,6 +166,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     if (submitting) submitButton.setAttribute("aria-busy", "true");
     else submitButton.removeAttribute("aria-busy");
     fields.disabled = submitting;
+    submitStatus.textContent = submitting ? "Enviando..." : "";
   }
 
   /** El token ya no sirve (respondido o vencido): se quita de la barra de direcciones. */

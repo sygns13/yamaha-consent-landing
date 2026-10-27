@@ -5,33 +5,36 @@ import type { HTMLAttributes } from "astro/types";
  * Mensaje de error dentro de la página (nunca window.alert). El slot es el mensaje y, si hace falta, una acción
  * como "Reintentar".
  *
- * Puede nacer oculto con `hidden`. Al mostrarlo, role="alert" hace que el lector de pantalla lo anuncie; para
- * volver a anunciar el mismo error (otro reintento fallido), ocultarlo y mostrarlo de nuevo.
+ * El contenedor exterior es la región en vivo (role="alert", aria-live="assertive") y nunca se oculta: `id`,
+ * `class`, `hidden` y el resto de atributos van a la caja interior. Al mostrarla (quitar `hidden`) su contenido
+ * aparece dentro de una región que ya existía, y así los lectores de pantalla lo anuncian de forma confiable. Para
+ * volver a anunciar el mismo error (otro reintento fallido), ocultarla y mostrarla de nuevo.
  */
 type Props = HTMLAttributes<"div">;
 
 const { class: className, ...attrs } = Astro.props;
 ---
 
-<div
-  role="alert"
-  class:list={[
-    "flex items-start gap-3 rounded-md border border-danger/30 bg-danger-surface p-4 text-sm leading-relaxed text-danger",
-    className,
-  ]}
-  {...attrs}
->
-  <svg
-    aria-hidden="true"
-    class="mt-0.5 size-5 shrink-0"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    stroke-width="2"
-    stroke-linecap="round"
+<div role="alert" aria-live="assertive" aria-atomic="true">
+  <div
+    class:list={[
+      "flex items-start gap-3 rounded-md border border-danger/30 bg-danger-surface p-4 text-sm leading-relaxed text-danger",
+      className,
+    ]}
+    {...attrs}
   >
-    <circle cx="12" cy="12" r="9"></circle>
-    <path d="M12 7.5v5.5M12 16.5h.01"></path>
-  </svg>
-  <div class="flex-1 space-y-3"><slot /></div>
+    <svg
+      aria-hidden="true"
+      class="mt-0.5 size-5 shrink-0"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+    >
+      <circle cx="12" cy="12" r="9"></circle>
+      <path d="M12 7.5v5.5M12 16.5h.01"></path>
+    </svg>
+    <div class="flex-1 space-y-3"><slot /></div>
+  </div>
 </div>

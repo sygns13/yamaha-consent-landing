@@ -19,7 +19,8 @@ const { busyLabel = "Enviando...", type = "submit", class: className, ...attrs }
   class:list={[
     "group flex min-h-12 w-full items-center justify-center rounded bg-brand px-4 py-3 text-base font-bold tracking-wide text-white transition-colors",
     "enabled:hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
-    "disabled:cursor-default disabled:opacity-70",
+    // 80 %: "Enviando..." en blanco sobre el azul atenuado conserva contraste AA (5.2:1).
+    "disabled:cursor-default disabled:opacity-80",
     className,
   ]}
   {...attrs}
