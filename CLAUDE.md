@@ -35,6 +35,10 @@ The workspace-level `../CLAUDE.md` covers the whole system (backend, business ru
 
 - Astro 7, `output: "static"`, TypeScript strict, **no UI framework**. The form logic lives in a `<script>` inside the page. Everything token-related happens client-side at runtime, since the site is static.
 - Tailwind CSS 4 via `@tailwindcss/vite` (no `tailwind.config`). Brand colors are `@theme` tokens in `src/styles/global.css` (`brand`, `brand-dark`, `surface`), taken from the mockup.
+- `src/components/` have no JavaScript of their own; the page script drives them through attributes:
+  - `ConsentCheckbox`: its `[data-privacy-link]` is rendered without `href`, and the page sets the URL after the GET. Without `href` it looks and reads as plain text.
+  - `PrimaryButton`: `disabled` plus `aria-busy="true"` swaps the label for "Enviando...".
+  - `Alert`: toggle `hidden` to show it. `role="alert"` announces it; hide and show it again to re-announce.
 - `src/layouts/BaseLayout.astro` holds the shared header ("YAMAHA" + "Privacidad y consentimiento"), `lang="es"` and `noindex`. All three pages use it.
 - Build-time env vars: `PUBLIC_API_BASE_URL` and `PUBLIC_PRIVACY_POLICY_URL` (PENDIENTE-14). They are typed in `src/env.d.ts`. Add any new `PUBLIC_*` var there and to `.env.example` and the README table.
 - Hosting: Firebase Hosting, `firebase.json` with `public: "dist"` and `cleanUrls: true`, so pages are `/gracias` and `/enlace-invalido` without `.html`. The security headers there include `Referrer-Policy: no-referrer`, which keeps the `?t=` token from leaking to the privacy-policy site. Don't remove it.

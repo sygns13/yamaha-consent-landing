@@ -5,4 +5,8 @@
   --color-brand: #3224ff;
   --color-brand-dark: #2418d6;
   --color-surface: #f2f3f6;
+
+  /* Mensajes de error (Alert). El mockup no los define; texto sobre fondo con contraste AA (5.9:1). */
+  --color-danger: #b91c1c;
+  --color-danger-surface: #fef2f2;
 }

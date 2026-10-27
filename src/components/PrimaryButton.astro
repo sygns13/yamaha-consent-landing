@@ -1,0 +1,35 @@
+---
+import type { HTMLAttributes } from "astro/types";
+
+/**
+ * Botón principal: azul y de ancho completo (mockup). El slot es la etiqueta, p. ej. "ENVIAR".
+ *
+ * Mientras se envía, el script de la página lo deshabilita y le pone aria-busy="true": la etiqueta se cambia por
+ * `busyLabel` sin más JavaScript. Al terminar, quitar ambos.
+ */
+interface Props extends HTMLAttributes<"button"> {
+  busyLabel?: string;
+}
+
+const { busyLabel = "Enviando...", type = "submit", class: className, ...attrs } = Astro.props;
+---
+
+<button
+  type={type}
+  class:list={[
+    "group flex min-h-12 w-full items-center justify-center rounded bg-brand px-4 py-3 text-base font-bold tracking-wide text-white transition-colors",
+    "enabled:hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+    "disabled:cursor-default disabled:opacity-70",
+    className,
+  ]}
+  {...attrs}
+>
+  <span class="group-aria-busy:hidden"><slot /></span>
+  <span class="hidden items-center gap-2 group-aria-busy:inline-flex">
+    <svg aria-hidden="true" class="size-4 motion-safe:animate-spin" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.3" stroke-width="3"></circle>
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+    </svg>
+    {busyLabel}
+  </span>
+</button>

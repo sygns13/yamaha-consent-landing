@@ -1,0 +1,41 @@
+---
+/**
+ * Checkbox de la landing con su <label> y el enlace a la política de privacidad.
+ *
+ * El slot es el texto que va antes del enlace y `suffix` lo que va después (p. ej. el punto final).
+ * Los <strong> del slot se muestran en negrita y más oscuros, como "YAMAHA" y "DEALER" en el mockup.
+ *
+ * El enlace nace sin href: la URL se conoce recién al validar el enlace (GET), y el script de la página la pone
+ * en cada [data-privacy-link]. Sin href se ve y se lee como texto normal.
+ * TODO(PENDIENTE-14): URL real de la política de privacidad.
+ */
+interface Props {
+  /** Campo del body de submit (ConsentSubmitRequest). También es el id del checkbox. */
+  name: "personal_data" | "marketing_yamaha" | "marketing_dealer";
+  suffix?: string;
+}
+
+const { name, suffix = "" } = Astro.props;
+---
+
+<div class="flex items-start gap-3">
+  <input
+    id={name}
+    name={name}
+    type="checkbox"
+    class="mt-0.75 size-5 shrink-0 cursor-pointer accent-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+  />
+  <label
+    for={name}
+    class="cursor-pointer text-base leading-relaxed text-slate-600 [&_strong]:font-bold [&_strong]:text-slate-900"
+  >
+    <slot />
+    <a
+      data-privacy-link
+      target="_blank"
+      rel="noopener noreferrer"
+      class="rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand [&[href]]:text-brand [&[href]]:underline [&[href]]:underline-offset-2 [&[href]]:hover:text-brand-dark"
+      >política de privacidad<span class="sr-only [a:not([href])_&]:hidden"> (se abre en una pestaña nueva)</span></a
+    >{suffix}
+  </label>
+</div>
