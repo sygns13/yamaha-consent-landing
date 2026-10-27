@@ -1,0 +1,14 @@
+# build
+dist/
+.astro/
+# dependencias
+node_modules/
+# entorno
+.env
+.env.production
+# logs
+npm-debug.log*
+# firebase
+.firebase/
+# editor
+.DS_Store

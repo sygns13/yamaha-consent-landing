@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Colores tomados del mockup de la landing */
+@theme {
+  --color-brand: #3224ff;
+  --color-brand-dark: #2418d6;
+  --color-surface: #f2f3f6;
+}

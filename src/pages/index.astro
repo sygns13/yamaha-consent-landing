@@ -1,0 +1,15 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+// Página base: el formulario completo se implementa en el módulo M6 de REQUERIMIENTOS_TECNICOS.md
+const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL;
+---
+
+<BaseLayout title="Autorización de datos | Yamaha">
+  <p class="text-xs font-semibold uppercase tracking-wider text-brand">Autorización de datos</p>
+  <h1 class="mt-2 text-3xl font-bold leading-tight">Tu privacidad es importante</h1>
+  <p class="mt-3 text-slate-600">Entorno local listo. El formulario se construye en el módulo M6.</p>
+  <p class="mt-6 rounded-md bg-white p-3 text-sm text-slate-500">
+    API configurada: <code class="text-slate-800">{apiBaseUrl}</code>
+  </p>
+</BaseLayout>
