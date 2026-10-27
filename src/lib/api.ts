@@ -23,8 +23,9 @@ export type ConsentStatus = "ACEPTADO" | "NO_ACEPTADO";
 export interface ConsentLinkInfo {
   link_status: LinkStatus;
   privacy_policy_url: string | null;
-  // TODO(PENDIENTE-05): hoy siempre null; la landing muestra "DEALER".
-  dealer_display_name?: null;
+  // TODO(PENDIENTE-05): docs/openapi.json lo define como null (la API aún no lo envía). Se acepta también un string
+  // para que la landing lo muestre cuando la API lo devuelva; mientras sea null, la landing muestra "DEALER".
+  dealer_display_name?: string | null;
 }
 
 /** `ConsentSubmitRequest`: los tres checks. La API rechaza (422) campos extra o valores que no sean booleanos. */
@@ -53,7 +54,10 @@ export type LinkUnavailable = { kind: "EXPIRED" } | { kind: "USED" } | { kind: "
 /** Red caída, timeout, 5xx, 422 o respuesta inesperada: la landing muestra el error y permite reintentar. */
 export type NetworkError = { kind: "NETWORK_ERROR" };
 
-export type ConsentLinkResult = { kind: "VALID"; privacyPolicyUrl: string | null } | LinkUnavailable | NetworkError;
+export type ConsentLinkResult =
+  | { kind: "VALID"; privacyPolicyUrl: string | null; dealerDisplayName: string | null }
+  | LinkUnavailable
+  | NetworkError;
 
 export type SubmitConsentResult = { kind: "SUBMITTED"; status: ConsentStatus } | LinkUnavailable | NetworkError;
 
@@ -67,8 +71,9 @@ export async function getConsentLink(token: string): Promise<ConsentLinkResult> 
 
   if (response.status === 200) {
     if (!isConsentLinkInfo(response.body)) return NETWORK_ERROR;
-    const { link_status, privacy_policy_url } = response.body;
-    return link_status === "VALID" ? { kind: "VALID", privacyPolicyUrl: privacy_policy_url } : { kind: link_status };
+    const { link_status, privacy_policy_url, dealer_display_name } = response.body;
+    if (link_status !== "VALID") return { kind: link_status };
+    return { kind: "VALID", privacyPolicyUrl: privacy_policy_url, dealerDisplayName: dealer_display_name ?? null };
   }
   return unavailableResult(response) ?? NETWORK_ERROR;
 }
@@ -149,7 +154,10 @@ function isConsentLinkInfo(value: unknown): value is ConsentLinkInfo {
   return (
     isRecord(value) &&
     isLinkStatus(value.link_status) &&
-    (value.privacy_policy_url === null || typeof value.privacy_policy_url === "string")
+    (value.privacy_policy_url === null || typeof value.privacy_policy_url === "string") &&
+    (value.dealer_display_name === undefined ||
+      value.dealer_display_name === null ||
+      typeof value.dealer_display_name === "string")
   );
 }
 

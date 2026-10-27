@@ -1,15 +1,152 @@
 ---
+import Alert from "../components/Alert.astro";
+import ConsentCheckbox from "../components/ConsentCheckbox.astro";
+import PrimaryButton from "../components/PrimaryButton.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 
-// Página base: el formulario completo se implementa en el módulo M6 de REQUERIMIENTOS_TECNICOS.md
-const apiBaseUrl = import.meta.env.PUBLIC_API_BASE_URL;
+// Landing de conformidad (M6): /?t={token}. Todo depende del token, así que la validación ocurre en el navegador.
 ---
 
 <BaseLayout title="Autorización de datos | Yamaha">
-  <p class="text-xs font-semibold uppercase tracking-wider text-brand">Autorización de datos</p>
-  <h1 class="mt-2 text-3xl font-bold leading-tight">Tu privacidad es importante</h1>
-  <p class="mt-3 text-slate-600">Entorno local listo. El formulario se construye en el módulo M6.</p>
-  <p class="mt-6 rounded-md bg-white p-3 text-sm text-slate-500">
-    API configurada: <code class="text-slate-800">{apiBaseUrl}</code>
-  </p>
+  <div id="loading" role="status" class="flex flex-col items-center gap-3 py-16 text-slate-600 noscript:hidden">
+    <svg aria-hidden="true" class="size-8 text-brand motion-safe:animate-spin" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.25" stroke-width="3"></circle>
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+    </svg>
+    <p>Cargando...</p>
+  </div>
+
+  <noscript>
+    <Alert>
+      <p>Para continuar, activa JavaScript en tu navegador.</p>
+    </Alert>
+  </noscript>
+
+  <Alert id="load-error" hidden>
+    <p>No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.</p>
+    <button
+      id="retry-button"
+      type="button"
+      class="rounded-sm font-semibold underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
+    >
+      Reintentar
+    </button>
+  </Alert>
+
+  <section id="consent" hidden class="sm:rounded-xl sm:bg-white sm:p-8 sm:shadow-sm">
+    <p class="text-xs font-semibold uppercase tracking-wider text-brand">Autorización de datos</p>
+    <h1 class="mt-2 text-3xl font-bold leading-tight text-slate-900">Tu privacidad es importante</h1>
+    <p class="mt-3 leading-relaxed text-slate-600">
+      Antes de continuar, revisa la política de privacidad y selecciona las autorizaciones que deseas otorgar.
+    </p>
+
+    <hr class="my-6 border-slate-200" />
+
+    <!--
+      RN-01 (PENDIENTE-01 y PENDIENTE-17, sección 11): sin la nota "* Autorización obligatoria para continuar" ni
+      asterisco en el check 1. Los checks nacen desmarcados y ENVIAR está siempre habilitado: se puede enviar con
+      cualquier combinación, incluso con todo desmarcado.
+    -->
+    <form id="consent-form" novalidate>
+      <fieldset class="space-y-6">
+        <legend class="sr-only">Autorizaciones</legend>
+        <ConsentCheckbox name="personal_data">Acepto la</ConsentCheckbox>
+        <ConsentCheckbox name="marketing_yamaha" suffix=".">
+          Autorizo a <strong>YAMAHA</strong> para el tratamiento de mis datos personales con fines de perfilamiento y
+          envío de publicidad, de acuerdo con la
+        </ConsentCheckbox>
+        <ConsentCheckbox name="marketing_dealer" suffix=".">
+          Autorizo al <strong data-dealer-name>DEALER</strong> para el tratamiento de mis datos personales con fines
+          de perfilamiento y envío de publicidad, de acuerdo con la
+        </ConsentCheckbox>
+      </fieldset>
+
+      <PrimaryButton id="submit-button" class="mt-8">ENVIAR</PrimaryButton>
+    </form>
+  </section>
 </BaseLayout>
+
+<script>
+  import { getConsentLink, type LinkUnavailable } from "../lib/api";
+
+  const INVALID_LINK_REASONS: Record<LinkUnavailable["kind"], string> = {
+    EXPIRED: "vencido",
+    USED: "usado",
+    NOT_FOUND: "invalido",
+  };
+
+  const loading = document.getElementById("loading")!;
+  const loadError = document.getElementById("load-error")!;
+  const retryButton = document.getElementById("retry-button")!;
+  const consent = document.getElementById("consent")!;
+  const form = document.getElementById("consent-form") as HTMLFormElement;
+
+  /** replace(): el botón Atrás no vuelve a esta página. */
+  function goToInvalidLink(reason: string): void {
+    location.replace(`/enlace-invalido?motivo=${reason}`);
+  }
+
+  function isHttpUrl(value: string): boolean {
+    try {
+      const { protocol } = new URL(value);
+      return protocol === "https:" || protocol === "http:";
+    } catch {
+      return false;
+    }
+  }
+
+  /** La URL que devuelve la API; si es null, la de build; si no hay ninguna, el texto queda sin enlace. */
+  function resolvePrivacyPolicyUrl(fromApi: string | null): string | null {
+    // TODO(PENDIENTE-14): URL real de la política de privacidad.
+    for (const candidate of [fromApi, import.meta.env.PUBLIC_PRIVACY_POLICY_URL]) {
+      if (candidate && isHttpUrl(candidate)) return candidate;
+    }
+    return null;
+  }
+
+  function showForm(privacyPolicyUrl: string | null, dealerDisplayName: string | null): void {
+    const url = resolvePrivacyPolicyUrl(privacyPolicyUrl);
+    if (url !== null) {
+      for (const link of document.querySelectorAll<HTMLAnchorElement>("[data-privacy-link]")) link.href = url;
+    }
+    // TODO(PENDIENTE-05): mientras la API no envíe el nombre del Dealer, queda el texto "DEALER" del HTML.
+    if (dealerDisplayName) {
+      for (const name of document.querySelectorAll("[data-dealer-name]")) name.textContent = dealerDisplayName;
+    }
+    loading.hidden = true;
+    consent.hidden = false;
+  }
+
+  async function validateLink(token: string, isRetry: boolean): Promise<void> {
+    loadError.hidden = true;
+    loading.hidden = false;
+
+    const result = await getConsentLink(token);
+    switch (result.kind) {
+      case "VALID":
+        showForm(result.privacyPolicyUrl, result.dealerDisplayName);
+        return;
+      case "NETWORK_ERROR":
+        // El enlace puede estar bien: se queda en la página y permite reintentar.
+        loading.hidden = true;
+        loadError.hidden = false;
+        if (isRetry) retryButton.focus();
+        return;
+      default:
+        // El indicador de carga sigue visible hasta que cambia la página.
+        goToInvalidLink(INVALID_LINK_REASONS[result.kind]);
+    }
+  }
+
+  // El envío (POST /submit) se agrega en el siguiente paso de M6. Mientras tanto, el formulario no se envía solo:
+  // un envío nativo recargaría la página con los checks en la URL y sin el token.
+  form.addEventListener("submit", (event) => event.preventDefault());
+
+  const token = new URLSearchParams(location.search).get("t");
+  if (!token) {
+    goToInvalidLink(INVALID_LINK_REASONS.NOT_FOUND);
+  } else {
+    retryButton.addEventListener("click", () => void validateLink(token, true));
+    void validateLink(token, false);
+  }
+</script>

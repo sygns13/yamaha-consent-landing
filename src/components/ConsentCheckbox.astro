@@ -29,8 +29,7 @@ const { name, suffix = "" } = Astro.props;
     for={name}
     class="cursor-pointer text-base leading-relaxed text-slate-600 [&_strong]:font-bold [&_strong]:text-slate-900"
   >
-    <slot />
-    <a
+    <slot />{" "}<a
       data-privacy-link
       target="_blank"
       rel="noopener noreferrer"
