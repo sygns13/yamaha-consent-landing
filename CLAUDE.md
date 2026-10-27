@@ -16,6 +16,7 @@ The workspace-level `../CLAUDE.md` covers the whole system (backend, business ru
 - Static Astro only (`output: "static"`). No UI framework: no React, Vue, Svelte, Preact, Solid or their `@astrojs/*` integrations. Interactivity is plain TypeScript in a page `<script>`.
 - Tailwind CSS 4 using the `@theme` color tokens in `src/styles/global.css` (`brand`, `brand-dark`, `surface`). No hex values in markup (`bg-[#...]`); a new color becomes a token there first.
 - All user-facing text is in Spanish. Code and identifiers stay in English (spec section 0).
+- Every call to the backend goes through `src/lib/api.ts` (`getConsentLink`, `submitConsent`). No `fetch` anywhere else. Its functions never throw: they return a result discriminated by `kind` (`VALID`/`SUBMITTED`, `EXPIRED`, `USED`, `NOT_FOUND`, `NETWORK_ERROR`), and its types mirror the schemas in `docs/openapi.json`.
 - Never use `window.alert` or `window.confirm`. Loading, errors and retries are shown inline in the page.
 - Anything marked `PENDIENTE-n` in the spec gets only its "mientras tanto" behavior plus a `TODO(PENDIENTE-n)` comment at that spot in the code. Today that means PENDIENTE-05 (literal "DEALER") and PENDIENTE-14 (privacy-policy URL from env).
 
