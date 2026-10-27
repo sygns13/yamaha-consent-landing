@@ -48,7 +48,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       cualquier combinación, incluso con todo desmarcado.
     -->
     <form id="consent-form" novalidate>
-      <fieldset class="space-y-6">
+      <fieldset id="consent-fields" class="space-y-6">
         <legend class="sr-only">Autorizaciones</legend>
         <ConsentCheckbox name="personal_data">Acepto la</ConsentCheckbox>
         <ConsentCheckbox name="marketing_yamaha" suffix=".">
@@ -61,13 +61,17 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         </ConsentCheckbox>
       </fieldset>
 
+      <Alert id="submit-error" hidden class="mt-8">
+        <p>No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.</p>
+      </Alert>
+
       <PrimaryButton id="submit-button" class="mt-8">ENVIAR</PrimaryButton>
     </form>
   </section>
 </BaseLayout>
 
 <script>
-  import { getConsentLink, type LinkUnavailable } from "../lib/api";
+  import { getConsentLink, submitConsent, type LinkUnavailable } from "../lib/api";
 
   const INVALID_LINK_REASONS: Record<LinkUnavailable["kind"], string> = {
     EXPIRED: "vencido",
@@ -80,6 +84,9 @@ import BaseLayout from "../layouts/BaseLayout.astro";
   const retryButton = document.getElementById("retry-button")!;
   const consent = document.getElementById("consent")!;
   const form = document.getElementById("consent-form") as HTMLFormElement;
+  const fields = document.getElementById("consent-fields") as HTMLFieldSetElement;
+  const submitButton = document.getElementById("submit-button") as HTMLButtonElement;
+  const submitError = document.getElementById("submit-error")!;
 
   /** replace(): el botón Atrás no vuelve a esta página. */
   function goToInvalidLink(reason: string): void {
@@ -138,15 +145,65 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     }
   }
 
-  // El envío (POST /submit) se agrega en el siguiente paso de M6. Mientras tanto, el formulario no se envía solo:
-  // un envío nativo recargaría la página con los checks en la URL y sin el token.
-  form.addEventListener("submit", (event) => event.preventDefault());
+  function isChecked(name: string): boolean {
+    return (form.elements.namedItem(name) as HTMLInputElement).checked;
+  }
+
+  /** Bloquea el formulario mientras se envía: evita el doble clic y que se cambie un check ya enviado. */
+  function setSubmitting(submitting: boolean): void {
+    submitButton.disabled = submitting;
+    // PrimaryButton muestra "Enviando..." con aria-busy="true".
+    if (submitting) submitButton.setAttribute("aria-busy", "true");
+    else submitButton.removeAttribute("aria-busy");
+    fields.disabled = submitting;
+  }
+
+  /** El token ya no sirve (respondido o vencido): se quita de la barra de direcciones. */
+  function removeTokenFromUrl(): void {
+    const url = new URL(location.href);
+    url.searchParams.delete("t");
+    history.replaceState(history.state, "", url);
+  }
+
+  async function submit(token: string): Promise<void> {
+    // RN-01: sin validaciones ni confirmación. Cualquier combinación es válida, incluso todo desmarcado:
+    // un check desmarcado es un rechazo y así se registra.
+    submitError.hidden = true;
+    setSubmitting(true);
+
+    const result = await submitConsent(token, {
+      personal_data: isChecked("personal_data"),
+      marketing_yamaha: isChecked("marketing_yamaha"),
+      marketing_dealer: isChecked("marketing_dealer"),
+    });
+    switch (result.kind) {
+      case "SUBMITTED":
+        // ACEPTADO o NO_ACEPTADO: en ambos casos se agradece.
+        removeTokenFromUrl();
+        location.replace("/gracias");
+        return;
+      case "NETWORK_ERROR":
+        // El token se conserva en la URL: si el cliente recarga, la página vuelve a validar el enlace.
+        setSubmitting(false);
+        submitError.hidden = false;
+        submitButton.focus();
+        return;
+      default:
+        // 410 (vencido o usado) o 404. El botón sigue deshabilitado hasta que cambia la página.
+        removeTokenFromUrl();
+        goToInvalidLink(INVALID_LINK_REASONS[result.kind]);
+    }
+  }
 
   const token = new URLSearchParams(location.search).get("t");
   if (!token) {
     goToInvalidLink(INVALID_LINK_REASONS.NOT_FOUND);
   } else {
     retryButton.addEventListener("click", () => void validateLink(token, true));
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!submitButton.disabled) void submit(token);
+    });
     void validateLink(token, false);
   }
 </script>

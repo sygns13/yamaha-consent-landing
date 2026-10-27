@@ -54,6 +54,8 @@ The workspace-level `../CLAUDE.md` covers the whole system (backend, business ru
   - `200` (`ACEPTADO` or `NO_ACEPTADO`) → `/gracias`.
   - `410` → `/enlace-invalido?motivo=vencido|usado` from the body's `link_status`. `404` → `?motivo=invalido`.
   - Network error, timeout, `5xx` or `422` → re-enable the button and show inline: "No pudimos conectar. Revisa tu conexión e inténtalo de nuevo."
+  - While sending, the checkbox `<fieldset>` is disabled too, so a box can't change after its value was sent.
+  - Once the submit has a final outcome (`200`, `410`, `404`), `history.replaceState` removes `t` from the URL before redirecting. On a network error the token stays, so a reload re-validates the link.
 - Both calls abort after a fixed **15 s** (`AbortController`) and count as a network error. Owner's decision, not configurable. It was checked against the API: the public endpoints have no server-side limit below that (no DB `statement_timeout`/`lock_timeout`, Cloud Run default 300 s), and the API's 10 s timeouts (Twilio, KIZUNA) don't run inside these requests (KIZUNA runs after the response). A submit that times out may still commit; the retry then gets `410 USED`.
 - Redirects use `location.replace()`, so Back never returns to an already-submitted form. The page has a `<noscript>` message in Spanish.
 - Privacy-policy URL: `privacy_policy_url` from the GET; if `null`, `PUBLIC_PRIVACY_POLICY_URL`; if both are missing, the words "política de privacidad" without a link. `TODO(PENDIENTE-14)`.
