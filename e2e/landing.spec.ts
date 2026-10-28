@@ -136,6 +136,14 @@ test.describe("error de red con reintento", () => {
   });
 });
 
+test("una ruta inexistente responde 404 con la página propia en español", async ({ page }) => {
+  const response = await page.goto("/no-existe");
+
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Página no encontrada");
+  await expect(page.locator("html")).toHaveAttribute("lang", "es");
+});
+
 test("doble clic en ENVIAR envía una sola vez", async ({ page }) => {
   // La respuesta del envío se retiene hasta terminar los clics, como con una red lenta.
   let releaseSubmit!: () => void;

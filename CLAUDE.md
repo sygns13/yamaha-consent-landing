@@ -44,9 +44,15 @@ The workspace-level `../CLAUDE.md` covers the whole system (backend, business ru
   - `ConsentCheckbox`: its `[data-privacy-link]` is rendered without `href`, and the page sets the URL after the GET. Without `href` it looks and reads as plain text.
   - `PrimaryButton`: `disabled` plus `aria-busy="true"` swaps the label for "Enviando...".
   - `Alert`: an outer live region (`role="alert"`, `aria-live="assertive"`) that is never hidden, around an inner box that gets `id`, `class` and `hidden`. Toggle the box's `hidden`; hide and show it again to re-announce. The loading indicator in `index.astro` follows the same pattern (a `role="status"` wrapper that also announces "Enviando..."). Live regions that are hidden themselves aren't announced reliably.
-- `src/layouts/BaseLayout.astro` holds the shared header ("YAMAHA" + "Privacidad y consentimiento"), `lang="es"` and `noindex`. All three pages use it.
+- `src/layouts/BaseLayout.astro` holds the shared header ("YAMAHA" + "Privacidad y consentimiento"), `lang="es"` and `noindex`. All pages use it.
+- `src/pages/404.astro` is outside the spec: the owner approved it on 27/10/2026, and its text is a proposal. It builds to `dist/404.html`, which Firebase Hosting serves with status 404 for any unknown path. Without it, Firebase shows its generic page in English. Like the other pages, it has no JS, no buttons and no technical data.
 - Build-time env vars: `PUBLIC_API_BASE_URL` and `PUBLIC_PRIVACY_POLICY_URL` (PENDIENTE-14). They are typed in `src/env.d.ts`. Add any new `PUBLIC_*` var there and to `.env.example` and the README table.
 - Hosting: Firebase Hosting, `firebase.json` with `public: "dist"` and `cleanUrls: true`, so pages are `/gracias` and `/enlace-invalido` without `.html`. The security headers there include `Referrer-Policy: no-referrer`, which keeps the `?t=` token from leaking to the privacy-policy site. Don't remove it.
+  - `"target": "landing"`: the site ID (M7 proposes `consent-landing`, but site IDs are globally unique) lives in `.firebaserc` via `firebase target:apply`. Without that mapping, deploy refuses to run.
+  - Cache: page routes (`regex ^/[^.]*$`) get `no-cache`, so a new deploy (e.g. a new API URL inlined in the HTML) shows at once. Hashed `/_astro/**` gets one year `immutable`. The two rules must not overlap.
+  - Production build vars go in `.env.production` (template `.env.production.example`, file gitignored). Vite loads it over `.env` in `astro build` only, not in `npm run dev`.
+  - The full manual deploy (login, site, target, build, deploy, Hostinger DNS) is in `README.md`.
+  - The local Hosting emulator on Windows ignores every header rule: superstatic's `glob-slasher` turns `**` into `\**`. Production isn't affected, so don't "fix" `firebase.json` because of it.
 
 ## Page flow (spec M6 + M4 contract)
 
