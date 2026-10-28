@@ -23,6 +23,10 @@ npm run dev                 # http://localhost:4321
 | `npm run dev` | Servidor de desarrollo con recarga en caliente |
 | `npm run build` | Verifica tipos (`astro check`) y genera el sitio en `dist/` |
 | `npm run preview` | Sirve `dist/` para revisarlo como en producción |
+| `npm run test:e2e` | Pruebas e2e con Playwright (`e2e/`). Simulan la API, no necesitan el backend |
+
+Antes de la primera ejecución de las pruebas e2e, instala el navegador con `npx playwright install chromium`.
+Las pruebas construyen el sitio con URLs ficticias en `dist-e2e/` (no tocan `dist/`) y lo sirven en el puerto 4322.
 
 ## Variables de entorno (build)
 

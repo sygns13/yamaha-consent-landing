@@ -25,7 +25,12 @@ The workspace-level `../CLAUDE.md` covers the whole system (backend, business ru
 - `npm run dev` → http://localhost:4321. Copy `.env.example` to `.env` first.
   - The backend must be running on port 8000 (`uv run uvicorn app.main:app --reload --port 8000` from `../yamaha-consent-api`).
   - The API's `CORS_ALLOWED_ORIGINS` must include `http://localhost:4321` (its `.env.example` already does).
-- `npm run build` runs `astro check` (strict TypeScript) and then `astro build` into `dist/`. There is no separate lint or test command; `astro check` is the type gate.
+- `npm run build` runs `astro check` (strict TypeScript) and then `astro build` into `dist/`. There is no separate lint command; `astro check` is the type gate (it also checks `e2e/` and `playwright.config.ts`).
+- `npm run test:e2e` runs the Playwright e2e tests (`e2e/`), no backend needed. First time: `npx playwright install chromium`. Single test: `npx playwright test -g "doble clic"`.
+  - The `webServer` builds with fake URLs (`http://api.e2e.test`, set as process env, which beats `.env`) into `dist-e2e/` via `e2e/astro.config.mjs`, and previews it on port 4322. `dist/` is never touched.
+  - `e2e/mock-api.ts` simulates both public endpoints with `page.route`. `mockApi()` takes a list of responses per endpoint (`"network-error"` aborts) and returns the GET count and every POST body.
+  - Every test runs in two projects: `mobile` (Pixel 7) and `desktop`.
+  - No `@types/node`: TypeScript 6 doesn't load Node globals by default, and adding them would expose `process` to browser code. So the config files don't use `process`.
 - `npm run preview` serves `dist/`.
 - To get a valid token for `/?t=...` locally, run `uv run python -m scripts.issue_local_link <transaction_id>` from `../yamaha-consent-api`. Tokens only exist in the WhatsApp message otherwise.
 - Requires Node 24 LTS (Astro 7 needs Node >= 22.23.4).

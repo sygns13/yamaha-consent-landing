@@ -12,3 +12,7 @@ npm-debug.log*
 .firebase/
 # editor
 .DS_Store
+# pruebas e2e (Playwright)
+dist-e2e/
+test-results/
+playwright-report/
