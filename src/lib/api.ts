@@ -21,18 +21,17 @@ export type ConsentStatus = "ACEPTADO" | "NO_ACEPTADO";
 
 /** `ConsentLinkInfo`: respuesta 200 de GET /api/v1/public/consent-links/{token}. */
 export interface ConsentLinkInfo {
-  link_status: LinkStatus;
-  privacy_policy_url: string | null;
-  // TODO(PENDIENTE-05): docs/openapi.json lo define como null (la API aún no lo envía). Se acepta también un string
-  // para que la landing lo muestre cuando la API lo devuelva; mientras sea null, la landing muestra "DEALER".
-  dealer_display_name?: string | null;
+  linkStatus: LinkStatus;
+  privacyPolicyUrl: string | null;
+  // dealerName que envió KIZUNA. null si no lo envió: la landing muestra "DEALER".
+  dealerName: string | null;
 }
 
 /** `ConsentSubmitRequest`: los tres checks. La API rechaza (422) campos extra o valores que no sean booleanos. */
 export interface ConsentSubmitRequest {
-  personal_data: boolean;
-  marketing_yamaha: boolean;
-  marketing_dealer: boolean;
+  personalDataConsent: boolean;
+  marketingConsentYMDP: boolean;
+  marketingConsentDEALER: boolean;
 }
 
 /** `ConsentSubmitResponse`: respuesta 200 de POST /api/v1/public/consent-links/{token}/submit. */
@@ -43,7 +42,7 @@ export interface ConsentSubmitResponse {
 /** `LinkGoneResponse`: respuesta 410. */
 export interface LinkGoneResponse {
   detail: string;
-  link_status: Exclude<LinkStatus, "VALID">;
+  linkStatus: Exclude<LinkStatus, "VALID">;
 }
 
 // --- Resultados ---
@@ -55,7 +54,7 @@ export type LinkUnavailable = { kind: "EXPIRED" } | { kind: "USED" } | { kind: "
 export type NetworkError = { kind: "NETWORK_ERROR" };
 
 export type ConsentLinkResult =
-  | { kind: "VALID"; privacyPolicyUrl: string | null; dealerDisplayName: string | null }
+  | { kind: "VALID"; privacyPolicyUrl: string | null; dealerName: string | null }
   | LinkUnavailable
   | NetworkError;
 
@@ -71,9 +70,9 @@ export async function getConsentLink(token: string): Promise<ConsentLinkResult> 
 
   if (response.status === 200) {
     if (!isConsentLinkInfo(response.body)) return NETWORK_ERROR;
-    const { link_status, privacy_policy_url, dealer_display_name } = response.body;
-    if (link_status !== "VALID") return { kind: link_status };
-    return { kind: "VALID", privacyPolicyUrl: privacy_policy_url, dealerDisplayName: dealer_display_name ?? null };
+    const { linkStatus, privacyPolicyUrl, dealerName } = response.body;
+    if (linkStatus !== "VALID") return { kind: linkStatus };
+    return { kind: "VALID", privacyPolicyUrl, dealerName };
   }
   return unavailableResult(response) ?? NETWORK_ERROR;
 }
@@ -81,9 +80,9 @@ export async function getConsentLink(token: string): Promise<ConsentLinkResult> 
 export async function submitConsent(token: string, answers: ConsentSubmitRequest): Promise<SubmitConsentResult> {
   // Solo los tres campos: la API rechaza cualquier campo extra.
   const body: ConsentSubmitRequest = {
-    personal_data: answers.personal_data,
-    marketing_yamaha: answers.marketing_yamaha,
-    marketing_dealer: answers.marketing_dealer,
+    personalDataConsent: answers.personalDataConsent,
+    marketingConsentYMDP: answers.marketingConsentYMDP,
+    marketingConsentDEALER: answers.marketingConsentDEALER,
   };
   const response = await request(`${linkPath(token)}/submit`, {
     method: "POST",
@@ -132,12 +131,12 @@ async function request(url: string, init: RequestInit): Promise<HttpResponse | n
   }
 }
 
-/** 404 → NOT_FOUND; 410 según su link_status. Cualquier otro código → null. */
+/** 404 → NOT_FOUND; 410 según su linkStatus. Cualquier otro código → null. */
 function unavailableResult(response: HttpResponse): LinkUnavailable | null {
   if (response.status === 404) return { kind: "NOT_FOUND" };
   if (response.status !== 410) return null;
-  if (isLinkGoneResponse(response.body)) return { kind: response.body.link_status };
-  // 410 sin un link_status reconocible: el enlace no está disponible pero no se sabe por qué.
+  if (isLinkGoneResponse(response.body)) return { kind: response.body.linkStatus };
+  // 410 sin un linkStatus reconocible: el enlace no está disponible pero no se sabe por qué.
   // Reintentar no cambiaría nada, así que va a /enlace-invalido sin motivo, igual que un 404.
   return { kind: "NOT_FOUND" };
 }
@@ -153,11 +152,9 @@ function isLinkStatus(value: unknown): value is LinkStatus {
 function isConsentLinkInfo(value: unknown): value is ConsentLinkInfo {
   return (
     isRecord(value) &&
-    isLinkStatus(value.link_status) &&
-    (value.privacy_policy_url === null || typeof value.privacy_policy_url === "string") &&
-    (value.dealer_display_name === undefined ||
-      value.dealer_display_name === null ||
-      typeof value.dealer_display_name === "string")
+    isLinkStatus(value.linkStatus) &&
+    (value.privacyPolicyUrl === null || typeof value.privacyPolicyUrl === "string") &&
+    (value.dealerName === null || typeof value.dealerName === "string")
   );
 }
 
@@ -166,5 +163,5 @@ function isConsentSubmitResponse(value: unknown): value is ConsentSubmitResponse
 }
 
 function isLinkGoneResponse(value: unknown): value is LinkGoneResponse {
-  return isRecord(value) && (value.link_status === "EXPIRED" || value.link_status === "USED");
+  return isRecord(value) && (value.linkStatus === "EXPIRED" || value.linkStatus === "USED");
 }

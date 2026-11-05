@@ -22,11 +22,23 @@ async function expectThanksPage(page: Page): Promise<void> {
 }
 
 test.describe("link válido", () => {
+  test("muestra el dealerName que envía la API en el check 3", async ({ page }) => {
+    await mockApi(page, { link: [linkInfo("VALID", "ABC Motors")] });
+    await openValidLink(page);
+    await expect(page.getByRole("checkbox", { name: /^Autorizo al ABC Motors/ })).toBeVisible();
+  });
+
+  test("sin dealerName mantiene el texto DEALER", async ({ page }) => {
+    await mockApi(page, { link: [linkInfo("VALID", null)] });
+    await openValidLink(page);
+    await expect(page.getByRole("checkbox", { name: /^Autorizo al DEALER/ })).toBeVisible();
+  });
+
   test("con los tres checks marcados envía true en los tres y lleva a /gracias", async ({ page }) => {
     const api = await mockApi(page, { submit: [submitted("ACEPTADO")] });
     await openValidLink(page);
 
-    // privacy_policy_url viene null: se usa la URL de build (TODO(PENDIENTE-14)).
+    // privacyPolicyUrl viene null: se usa la URL de build (TODO(PENDIENTE-14)).
     for (const link of await page.getByRole("link", { name: /política de privacidad/ }).all()) {
       await expect(link).toHaveAttribute("href", E2E_PRIVACY_POLICY_URL);
       await expect(link).toHaveAttribute("target", "_blank");
@@ -38,7 +50,7 @@ test.describe("link válido", () => {
     await page.getByRole("button", { name: "ENVIAR" }).click();
 
     await expectThanksPage(page);
-    expect(api.submits).toEqual([{ personal_data: true, marketing_yamaha: true, marketing_dealer: true }]);
+    expect(api.submits).toEqual([{ personalDataConsent: true, marketingConsentYMDP: true, marketingConsentDEALER: true }]);
   });
 
   test("RN-01: con todos los checks desmarcados se puede enviar, manda false en los tres y lleva a /gracias", async ({
@@ -56,7 +68,7 @@ test.describe("link válido", () => {
     await page.getByRole("button", { name: "ENVIAR" }).click();
 
     await expectThanksPage(page);
-    expect(api.submits).toEqual([{ personal_data: false, marketing_yamaha: false, marketing_dealer: false }]);
+    expect(api.submits).toEqual([{ personalDataConsent: false, marketingConsentYMDP: false, marketingConsentDEALER: false }]);
   });
 });
 
@@ -131,7 +143,7 @@ test.describe("error de red con reintento", () => {
     await page.getByRole("button", { name: "ENVIAR" }).click();
 
     await expectThanksPage(page);
-    const answers = { personal_data: true, marketing_yamaha: false, marketing_dealer: false };
+    const answers = { personalDataConsent: true, marketingConsentYMDP: false, marketingConsentDEALER: false };
     expect(api.submits).toEqual([answers, answers]);
   });
 });

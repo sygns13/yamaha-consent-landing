@@ -18,18 +18,18 @@ const CORS_HEADERS = {
 export type LinkStatus = "VALID" | "EXPIRED" | "USED";
 
 export interface Answers {
-  personal_data: boolean;
-  marketing_yamaha: boolean;
-  marketing_dealer: boolean;
+  personalDataConsent: boolean;
+  marketingConsentYMDP: boolean;
+  marketingConsentDEALER: boolean;
 }
 
 /** Cómo responde la API simulada a cada llamada: JSON con un estado HTTP, o un corte de red. */
 export type MockResponse = { status: number; body: unknown } | "network-error";
 
-export function linkInfo(linkStatus: LinkStatus): MockResponse {
+export function linkInfo(linkStatus: LinkStatus, dealerName: string | null = null): MockResponse {
   return {
     status: 200,
-    body: { link_status: linkStatus, privacy_policy_url: null, dealer_display_name: null },
+    body: { linkStatus, privacyPolicyUrl: null, dealerName },
   };
 }
 

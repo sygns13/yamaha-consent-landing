@@ -121,14 +121,14 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     return null;
   }
 
-  function showForm(privacyPolicyUrl: string | null, dealerDisplayName: string | null): void {
+  function showForm(privacyPolicyUrl: string | null, dealerName: string | null): void {
     const url = resolvePrivacyPolicyUrl(privacyPolicyUrl);
     if (url !== null) {
       for (const link of document.querySelectorAll<HTMLAnchorElement>("[data-privacy-link]")) link.href = url;
     }
-    // TODO(PENDIENTE-05): mientras la API no envíe el nombre del Dealer, queda el texto "DEALER" del HTML.
-    if (dealerDisplayName) {
-      for (const name of document.querySelectorAll("[data-dealer-name]")) name.textContent = dealerDisplayName;
+    // dealerName de KIZUNA; si no lo envió, queda el texto "DEALER" del HTML.
+    if (dealerName) {
+      for (const name of document.querySelectorAll("[data-dealer-name]")) name.textContent = dealerName;
     }
     loading.hidden = true;
     consent.hidden = false;
@@ -141,7 +141,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     const result = await getConsentLink(token);
     switch (result.kind) {
       case "VALID":
-        showForm(result.privacyPolicyUrl, result.dealerDisplayName);
+        showForm(result.privacyPolicyUrl, result.dealerName);
         return;
       case "NETWORK_ERROR":
         // El enlace puede estar bien: se queda en la página y permite reintentar.
@@ -183,9 +183,9 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     setSubmitting(true);
 
     const result = await submitConsent(token, {
-      personal_data: isChecked("personal_data"),
-      marketing_yamaha: isChecked("marketing_yamaha"),
-      marketing_dealer: isChecked("marketing_dealer"),
+      personalDataConsent: isChecked("personal_data"),
+      marketingConsentYMDP: isChecked("marketing_yamaha"),
+      marketingConsentDEALER: isChecked("marketing_dealer"),
     });
     switch (result.kind) {
       case "SUBMITTED":

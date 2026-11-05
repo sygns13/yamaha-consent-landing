@@ -18,7 +18,7 @@ The workspace-level `../CLAUDE.md` covers the whole system (backend, business ru
 - All user-facing text is in Spanish. Code and identifiers stay in English (spec section 0).
 - Every call to the backend goes through `src/lib/api.ts` (`getConsentLink`, `submitConsent`). No `fetch` anywhere else. Its functions never throw: they return a result discriminated by `kind` (`VALID`/`SUBMITTED`, `EXPIRED`, `USED`, `NOT_FOUND`, `NETWORK_ERROR`), and its types mirror the schemas in `docs/openapi.json`.
 - Never use `window.alert` or `window.confirm`. Loading, errors and retries are shown inline in the page.
-- Anything marked `PENDIENTE-n` in the spec gets only its "mientras tanto" behavior plus a `TODO(PENDIENTE-n)` comment at that spot in the code. Today that means PENDIENTE-05 (literal "DEALER") and PENDIENTE-14 (privacy-policy URL from env).
+- Anything marked `PENDIENTE-n` in the spec gets only its "mientras tanto" behavior plus a `TODO(PENDIENTE-n)` comment at that spot in the code. Today that means PENDIENTE-14 (privacy-policy URL from env).
 
 ## Commands
 
@@ -58,20 +58,20 @@ The workspace-level `../CLAUDE.md` covers the whole system (backend, business ru
 
 - `/` reads `t` from the query string.
   - No token → `/enlace-invalido`.
-  - Otherwise `GET {PUBLIC_API_BASE_URL}/api/v1/public/consent-links/{t}` with a loading indicator. `200` with `link_status` `EXPIRED` → `/enlace-invalido?motivo=vencido`; `USED` → `?motivo=usado`; `404` (and no token) → `?motivo=invalido`.
+  - Otherwise `GET {PUBLIC_API_BASE_URL}/api/v1/public/consent-links/{t}` with a loading indicator. `200` with `linkStatus` `EXPIRED` → `/enlace-invalido?motivo=vencido`; `USED` → `?motivo=usado`; `404` (and no token) → `?motivo=invalido`.
   - GET fails (network, timeout, `5xx`) → stay on the page, show the error message inline with a "Reintentar" button. Don't send the user to `/enlace-invalido`: the link may be fine.
 - The three checkboxes start **unchecked**. **RN-01:** the ENVIAR button is always enabled, with no blocking validation and no confirmation dialog. All three unchecked is a valid submission (recorded as `NO_ACEPTADO`). The mockup's "* Autorización obligatoria para continuar" line is removed and check 1 has no asterisk.
-- Submit: disable the button, then `POST .../{t}/submit` with `{"personal_data", "marketing_yamaha", "marketing_dealer"}` as real JSON booleans (all three required, no extra fields, or the API returns `422`).
+- Submit: disable the button, then `POST .../{t}/submit` with `{"personalDataConsent", "marketingConsentYMDP", "marketingConsentDEALER"}` as real JSON booleans (the landing always sends all three; extra fields or non-booleans get `422`; the API stores a `null`/missing check as `false`). API JSON is camelCase in the KIZUNA style.
   - `200` (`ACEPTADO` or `NO_ACEPTADO`) → `/gracias`.
-  - `410` → `/enlace-invalido?motivo=vencido|usado` from the body's `link_status`. `404` → `?motivo=invalido`.
+  - `410` → `/enlace-invalido?motivo=vencido|usado` from the body's `linkStatus`. `404` → `?motivo=invalido`.
   - Network error, timeout, `5xx` or `422` → re-enable the button and show inline: "No pudimos conectar. Revisa tu conexión e inténtalo de nuevo."
   - While sending, the checkbox `<fieldset>` is disabled too, so a box can't change after its value was sent.
   - Once the submit has a final outcome (`200`, `410`, `404`), `history.replaceState` removes `t` from the URL before redirecting. On a network error the token stays, so a reload re-validates the link.
 - Both calls abort after a fixed **15 s** (`AbortController`) and count as a network error. Owner's decision, not configurable. It was checked against the API: the public endpoints have no server-side limit below that (no DB `statement_timeout`/`lock_timeout`, Cloud Run default 300 s), and the API's 10 s timeouts (Twilio, KIZUNA) don't run inside these requests (KIZUNA runs after the response). A submit that times out may still commit; the retry then gets `410 USED`.
 - Redirects use `location.replace()`, so Back never returns to an already-submitted form. The page has a `<noscript>` message in Spanish.
-- Privacy-policy URL: `privacy_policy_url` from the GET; if `null`, `PUBLIC_PRIVACY_POLICY_URL`; if both are missing, the words "política de privacidad" without a link. `TODO(PENDIENTE-14)`.
+- Privacy-policy URL: `privacyPolicyUrl` from the GET; if `null`, `PUBLIC_PRIVACY_POLICY_URL`; if both are missing, the words "política de privacidad" without a link. `TODO(PENDIENTE-14)`.
 - Every "política de privacidad" link opens in a new tab (`target="_blank" rel="noopener noreferrer"`), so the form and its checkboxes stay as they were (owner's decision, 27/10/2026). There is no modal: the policy is an external URL, and a cross-origin page can't be framed reliably or scroll-tracked. The links don't change any checkbox.
-- `dealer_display_name` (PENDIENTE-05): shown in check 3 when the API sends it; when `null` (always, for now) the page keeps the literal "DEALER".
+- `dealerName` (the `dealerName` KIZUNA sends, owner's decision 05/11/2026): shown in check 3; when `null` (KIZUNA didn't send it) the page keeps the literal "DEALER".
 - System font stack (Tailwind's default `font-sans`), no web fonts. Mobile-first; on desktop, a centered column with the header at full width.
 - The UI copy is fixed by the spec (M6 "Textos") and is in Spanish. Use it verbatim.
 - Acceptance: renders correctly at 360/768/1280 px, Lighthouse ≥ 90 for Performance and Accessibility on mobile, `<label>`s bound to the checkboxes, visible focus, AA contrast.
