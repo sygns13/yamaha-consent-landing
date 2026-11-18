@@ -6,7 +6,7 @@ The workspace-level `../CLAUDE.md` covers the whole system (backend, business ru
 
 ## Current state
 
-- This repo is the customer-facing landing, module **M6** of `REQUERIMIENTOS_TECNICOS.md` (v1.5; the spec, in Spanish, is the source of truth). M6 is implemented; v1.5 (17/11/2026) replaced the new-tab privacy link with an in-page pop-up (see Page flow). The test VPS runs it from the commit the owner pushes.
+- This repo is the customer-facing landing, module **M6** of `REQUERIMIENTOS_TECNICOS.md` (v1.5; the spec, in Spanish, is the source of truth). M6 is implemented; v1.5 (17/11/2026) replaced the new-tab privacy link with an in-page pop-up (see Page flow). The test VPS runs `96bafa0` (deployed 17/11/2026; `git pull` + `docker compose build landing && docker compose up -d landing` in `/var/www/consentimientos-test`).
 - `REQUERIMIENTOS_TECNICOS.md` here is a copy of `../requerimientos/REQUERIMIENTOS_TECNICOS.md`. After any spec change, keep all three copies identical (`cp` + `cmp`).
 - `docs/openapi.json` is a snapshot of the backend's OpenAPI schema. The landing only calls the two `/api/v1/public/consent-links/...` endpoints.
 - `assets/mockup-landing.png` is the visual reference. The `assets/` folder holds spec images and is not served (`public/` is the served static folder).
