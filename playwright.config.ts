@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { E2E_API_BASE_URL, E2E_PRIVACY_POLICY_URL } from "./e2e/mock-api";
+import { E2E_API_BASE_URL } from "./e2e/mock-api";
 
 const PORT = 4322;
 
@@ -27,7 +27,6 @@ export default defineConfig({
     // Las variables del proceso tienen prioridad sobre .env: el build no depende del .env local.
     env: {
       PUBLIC_API_BASE_URL: E2E_API_BASE_URL,
-      PUBLIC_PRIVACY_POLICY_URL: E2E_PRIVACY_POLICY_URL,
     },
   },
 });

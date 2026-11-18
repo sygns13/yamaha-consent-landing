@@ -2,6 +2,7 @@
 import Alert from "../components/Alert.astro";
 import ConsentCheckbox from "../components/ConsentCheckbox.astro";
 import PrimaryButton from "../components/PrimaryButton.astro";
+import PrivacyPolicyDialog from "../components/PrivacyPolicyDialog.astro";
 import BaseLayout from "../layouts/BaseLayout.astro";
 
 // Landing de conformidad (M6): /?t={token}. Todo depende del token, así que la validación ocurre en el navegador.
@@ -77,6 +78,9 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       </form>
     </div>
   </section>
+
+  <!-- Fuera de #consent: un <dialog> dentro de un contenedor oculto no se mostraría. -->
+  <PrivacyPolicyDialog />
 </BaseLayout>
 
 <script>
@@ -97,35 +101,15 @@ import BaseLayout from "../layouts/BaseLayout.astro";
   const submitButton = document.getElementById("submit-button") as HTMLButtonElement;
   const submitError = document.getElementById("submit-error")!;
   const submitStatus = document.getElementById("submit-status")!;
+  const privacyDialog = document.getElementById("privacy-dialog") as HTMLDialogElement;
+  const privacyBody = document.getElementById("privacy-dialog-body")!;
 
   /** replace(): el botón Atrás no vuelve a esta página. */
   function goToInvalidLink(reason: string): void {
     location.replace(`/enlace-invalido?motivo=${reason}`);
   }
 
-  function isHttpUrl(value: string): boolean {
-    try {
-      const { protocol } = new URL(value);
-      return protocol === "https:" || protocol === "http:";
-    } catch {
-      return false;
-    }
-  }
-
-  /** La URL que devuelve la API; si es null, la de build; si no hay ninguna, el texto queda sin enlace. */
-  function resolvePrivacyPolicyUrl(fromApi: string | null): string | null {
-    // TODO(PENDIENTE-14): URL real de la política de privacidad.
-    for (const candidate of [fromApi, import.meta.env.PUBLIC_PRIVACY_POLICY_URL]) {
-      if (candidate && isHttpUrl(candidate)) return candidate;
-    }
-    return null;
-  }
-
-  function showForm(privacyPolicyUrl: string | null, dealerName: string | null): void {
-    const url = resolvePrivacyPolicyUrl(privacyPolicyUrl);
-    if (url !== null) {
-      for (const link of document.querySelectorAll<HTMLAnchorElement>("[data-privacy-link]")) link.href = url;
-    }
+  function showForm(dealerName: string | null): void {
     // dealerName de KIZUNA; si no lo envió, queda el texto "DEALER" del HTML.
     if (dealerName) {
       for (const name of document.querySelectorAll("[data-dealer-name]")) name.textContent = dealerName;
@@ -141,7 +125,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     const result = await getConsentLink(token);
     switch (result.kind) {
       case "VALID":
-        showForm(result.privacyPolicyUrl, result.dealerName);
+        showForm(result.dealerName);
         return;
       case "NETWORK_ERROR":
         // El enlace puede estar bien: se queda en la página y permite reintentar.
@@ -204,6 +188,37 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         removeTokenFromUrl();
         goToInvalidLink(INVALID_LINK_REASONS[result.kind]);
     }
+  }
+
+  // Política de privacidad en un pop-up (spec v1.5): cada "política de privacidad" lo abre para su check. "Aceptar"
+  // marca ese check; "Cancelar" y Escape (que cierra el <dialog> sin returnValue) lo desmarcan. El texto de la
+  // política está en PrivacyPolicyDialog.astro (TODO(PENDIENTE-14)). La URL de la política que devuelve la API ya no
+  // se usa aquí: el backend la sigue guardando en la evidencia.
+  let privacyTrigger: HTMLButtonElement | null = null;
+
+  function openPrivacyPolicy(trigger: HTMLButtonElement): void {
+    privacyTrigger = trigger;
+    privacyDialog.returnValue = "";
+    privacyDialog.showModal();
+    privacyBody.scrollTop = 0;
+    privacyBody.focus();
+  }
+
+  privacyDialog.addEventListener("close", () => {
+    if (!privacyTrigger) return;
+    const checkbox = form.elements.namedItem(privacyTrigger.dataset.privacyTrigger ?? "") as HTMLInputElement | null;
+    if (checkbox) checkbox.checked = privacyDialog.returnValue === "accept";
+    privacyTrigger.focus();
+    privacyTrigger = null;
+  });
+  document.getElementById("privacy-accept")!.addEventListener("click", () => privacyDialog.close("accept"));
+  document.getElementById("privacy-cancel")!.addEventListener("click", () => privacyDialog.close("cancel"));
+  for (const trigger of document.querySelectorAll<HTMLButtonElement>("[data-privacy-trigger]")) {
+    // El botón está dentro del <label>: sin preventDefault, el clic también cambiaría el check.
+    trigger.addEventListener("click", (event) => {
+      event.preventDefault();
+      openPrivacyPolicy(trigger);
+    });
   }
 
   const token = new URLSearchParams(location.search).get("t");

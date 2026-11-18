@@ -1,0 +1,209 @@
+---
+/**
+ * Pop-up con la política de privacidad (spec v1.5, M6; decisión del responsable del 17/11/2026). Reemplaza al enlace
+ * que abría la política en una pestaña nueva: en las primeras pruebas confundía al cliente.
+ *
+ * Lo abre cualquier botón [data-privacy-trigger] de ConsentCheckbox. "Aceptar" marca el check de ese botón; "Cancelar"
+ * y Escape lo desmarcan. La lógica está en el script de index.astro.
+ *
+ * Texto: copia tal cual de https://www.yamaha-motor.com.pe/politicas-privacidad, hecha el 17/11/2026. Esa página no se
+ * puede incrustar (X-Frame-Options: SAMEORIGIN), por eso el texto vive aquí. Se conservan sus enlaces (abren en una
+ * pestaña nueva) y su numeración (1, 2, 4, 5 y 6: el original salta el 3). Si Yamaha cambia su política, se actualiza
+ * este texto y PRIVACY_POLICY_VERSION del backend.
+ * TODO(PENDIENTE-14): Yamaha confirma la URL y la versión vigentes de la política.
+ */
+const link =
+  "rounded-sm text-brand underline underline-offset-2 hover:text-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+const button =
+  "flex min-h-12 items-center justify-center rounded px-4 py-3 text-base font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+---
+
+<dialog
+  id="privacy-dialog"
+  aria-labelledby="privacy-dialog-title"
+  class="m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-hidden rounded-xl bg-white p-0 text-slate-700 shadow-xl backdrop:bg-slate-900/60 open:flex open:flex-col"
+>
+  <h2 id="privacy-dialog-title" class="border-b border-slate-200 px-5 py-4 text-xl font-bold text-slate-900 sm:px-6">
+    Políticas de Privacidad
+  </h2>
+
+  <!-- Región desplazable: recibe el foco al abrir, así el texto se recorre con el teclado. -->
+  <div
+    id="privacy-dialog-body"
+    role="region"
+    aria-labelledby="privacy-dialog-title"
+    tabindex="0"
+    class="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 text-sm leading-relaxed focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand sm:px-6 [&_ol]:list-decimal [&_ol]:space-y-4 [&_ol]:pl-5"
+  >
+    <p>
+      Por medio del presente documento, YAMAHA MOTOR DEL PERÚ S.A (en adelante, “YAMAHA”) con R.U.C. N° 20383929050,
+      domiciliado en Av. República de Panamá 4344, distrito de Surquillo, provincia y departamento de Lima, Perú, pone a
+      disposición de los usuarios su Política de Privacidad, la cual se encuentra en armonía con la normativa vigente
+      sobre protección de Datos Personales (Ley N° 29733 y Decreto Supremo 016-2024-JUS).
+    </p>
+    <p>
+      A continuación, se señalan las finalidades de tratamiento de la información que usted nos ha suministrado a través
+      de su registro en la <a href="https://www.yamaha-motor.com.pe/" target="_blank" rel="noopener noreferrer"
+        class={link}>página web<span class="sr-only"> (se abre en una pestaña nueva)</span></a
+      > o a través de los diferentes canales digitales de YAMAHA, quiénes son los encargados de tratarla, el tiempo de
+      almacenamiento en nuestras Bases de Datos, las medidas de seguridad, y los medios para ejercer sus derechos como
+      titular de los Datos Personales.
+    </p>
+
+    <ol>
+      <li>
+        <p>
+          ¿Cómo protegemos su información?<br />YAMAHA ha adoptado todas las medidas técnicas, legales y organizacionales
+          necesarias para garantizar la seguridad y el adecuado procesamiento de sus datos personales; así como para
+          evitar cualquier manipulación indebida, pérdida accidental, destrucción o acceso no autorizado de terceros.
+          Hacemos de su conocimiento que su información no será comercializada, transferida ni compartida sin su
+          autorización y para fines ajenos a los que se describen a continuación.
+        </p>
+      </li>
+      <li>
+        <p>
+          ¿Con qué finalidad utilizamos su información?<br />YAMAHA recopila datos personales a través de las distintas
+          secciones de su sitio web, formularios y canales digitales, conforme a las siguientes finalidades:
+        </p>
+      </li>
+    </ol>
+
+    <p>Sobre concursos, sorteos, activaciones, encuestas, redes sociales:</p>
+    <p>
+      YAMAHA podrá recopilar datos personales tales como: nombre, apellidos, documento nacional de identidad, teléfono,
+      correo electrónico, dirección, voz, entre otros. Dichos datos serán almacenados en el banco de datos denominado
+      “Prospectos de Clientes” (Código de registro: 24018) por un periodo determinado hasta cumplir con las finalidades
+      descritas en el presente documento o hasta que, de ser el caso, revoque su consentimiento.
+    </p>
+    <p>Asimismo, las finalidades de tratamiento son:</p>
+    <p>
+      (i) De brindar su consentimiento, remitir promociones, beneficios, concursos, ofertas y, en general, información
+      sobre los productos y servicios de la empresa.<br />(ii) Gestionar la inscripción a pruebas de manejo.<br />(iii)
+      Solicitar opiniones y evaluaciones con fines estadísticos e históricos.<br />Sobre el libro de reclamaciones:
+    </p>
+    <p>
+      YAMAHA podrá recopilar datos personales con la finalidad de establecer un medio de comunicación para dar respuesta
+      a las solicitudes de gestión, quejas y reclamos que han sido registrados por el usuario y/o consumidor. Dichos datos
+      serán almacenados en el banco de datos denominado “Libro de Reclamaciones” (Código de registro: 22099). Podrá
+      revisar el detalle del tratamiento en: <a
+        href="https://www.yamaha-motor.com.pe/politica-libro-de-reclamaciones"
+        target="_blank"
+        rel="noopener noreferrer"
+        class={link}
+        >Política de Privacidad del Libro de Reclamaciones<span class="sr-only"> (se abre en una pestaña nueva)</span></a
+      >.
+    </p>
+    <p>Sobre las secciones de la página web “Contáctate con Nosotros”, “Cotiza” y “Suscríbete”:</p>
+    <p>
+      YAMAHA podrá recopilar datos personales tales como: nombre, apellidos, documento nacional de identidad, teléfono,
+      correo electrónico y dirección, entre otros. Dichos datos serán almacenados en el banco de datos denominado
+      “Usuarios de la Página Web” (Código de registro: 24017) por un periodo determinado hasta cumplir con las
+      finalidades descritas en el presente documento o hasta que, de ser el caso, revoque su consentimiento.
+    </p>
+    <p>Asimismo, las finalidades de tratamiento son:</p>
+    <p>
+      (i) De brindar su consentimiento, perfilamiento y prospección comercial.<br />(ii) De brindar su consentimiento,
+      enviar información y comunicaciones relacionadas con productos y servicios.<br />(iii) Procesar ventas y gestionar
+      transacciones comerciales.<br />(iv) Administrar y gestionar planes de fidelización.<br />(v) Realizar
+      actividades de comercio electrónico.<br />Sobre el canal de denuncias:
+    </p>
+    <p>
+      YAMAHA podrá recopilar datos personales con la finalidad de atender, investigar y dar seguimiento a las denuncias o
+      comunicaciones recibidas a través de los canales de integridad o ética. Los datos serán almacenados en el banco de
+      datos denominado “Canal de Denuncias” (Código de registro: PJ-2025-2464). Podrá revisar el detalle del tratamiento
+      en: <a
+        href="https://www.yamaha-motor.com.pe/politica-canal-de-denuncias"
+        target="_blank"
+        rel="noopener noreferrer"
+        class={link}
+        >Política de Privacidad del Canal de Denuncias<span class="sr-only"> (se abre en una pestaña nueva)</span></a
+      >.
+    </p>
+    <p>Sobre los datos personales de clientes recopilados en los medios digitales:</p>
+    <p>
+      YAMAHA podrá recopilar datos personales con la finalidad de gestionar la relación comercial con sus clientes, dar
+      soporte a consultas, gestionar la inscripción a pruebas de manejo, coordinar servicios postventa, ejecutar
+      garantías y, en general, administrar la atención brindada en los diferentes puntos de contacto digitales. Dichos
+      datos serán almacenados en el banco de datos denominado “Clientes” (Código de registro: 01719) por un periodo
+      determinado hasta cumplir con las finalidades descritas en el presente documento o hasta que, de ser el caso,
+      revoque su consentimiento.
+    </p>
+    <p>Sobre el sistema de videovigilancia:</p>
+    <p>
+      YAMAHA ha dispuesto cámaras de videovigilancia con fines de seguridad de las instalaciones de la empresa. Las
+      imágenes obtenidas serán almacenadas en el banco de datos de su titularidad denominado “Videovigilancia” (Código
+      de registro: 06881) para los fines antes mencionados. Para más información ingresar a: <a
+        href="https://www.yamaha-motor.com.pe/politica-videovigilancia"
+        target="_blank"
+        rel="noopener noreferrer"
+        class={link}
+        >Política de Privacidad de Videovigilancia<span class="sr-only"> (se abre en una pestaña nueva)</span></a
+      >.
+    </p>
+
+    <ol start="4">
+      <li>
+        ¿Quién tiene acceso a su información?<br />Con el objeto de poder cumplir con las finalidades de tratamiento,
+        YAMAHA podrá transmitir su información a terceros proveedores de servicio, a nivel nacional y/o internacional.
+        Asimismo, en caso lo autorice expresamente, YAMAHA podrá transferir su información a sus empresas vinculadas,
+        para fines de prospección comercial. El detalle de estos terceros se encuentra en el <a
+          href="https://stgmkpprd.blob.core.windows.net/yamaha-peru-strapi/uploads/2026_Recopilacion_de_Anexos_Yamaha_Motor_Pe_f5f0019c26.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          class={link}>Anexo 1<span class="sr-only"> (se abre en una pestaña nueva)</span></a
+        > de la presente Política.
+      </li>
+    </ol>
+
+    <p>
+      Cabe precisar que, en estos casos, YAMAHA garantizará que el tratamiento de sus datos personales se limite a las
+      finalidades antes autorizadas, que se mantenga la confidencialidad y se implementen las medidas de seguridad
+      técnicas, organizativas y legales. Sin su consentimiento YAMAHA no podrá realizar el tratamiento de sus datos
+      personales para las finalidades anteriormente descritas.
+    </p>
+
+    <ol start="5">
+      <li>
+        ¿Cómo puede ejercer sus derechos como titular de Datos Personales?<br />YAMAHA reconoce y garantiza el ejercicio
+        de los derechos de acceso, rectificación, cancelación, oposición, portabilidad, información y revocación que por
+        ley le asisten. Para ejercer los derechos antes mencionados deberá completar el siguiente <a
+          href="https://stgmkpprd.blob.core.windows.net/yamaha-peru-strapi/uploads/Solicitud_para_ejercer_derechos_ARCOP_YMP_198c11e58b.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          class={link}>Formulario<span class="sr-only"> (se abre en una pestaña nueva)</span></a
+        >, presentándolo físicamente en la dirección Av. República de Panamá 4344, distrito de Surquillo, provincia y
+        departamento de Lima, Perú, o enviándolo al correo electrónico <a
+          href="mailto:protecciondedatos@yamaha.com.pe"
+          class={link}>protecciondedatos@yamaha.com.pe</a
+        > con el asunto "Derechos Datos Personales".
+      </li>
+    </ol>
+
+    <p>
+      En caso considere que no ha sido atendido adecuadamente, podrá presentar una reclamación ante la Autoridad Nacional
+      de Protección de Datos Personales, dirigiéndose a la Mesa de Partes del Ministerio de Justicia y Derechos Humanos
+      ubicado en Calle Scipión Llona N° 350, Miraflores, Lima, Perú.
+    </p>
+
+    <ol start="6">
+      <li>
+        Actualizaciones de la presente política de privacidad<br />Con motivo de la mejora continua de nuestros procesos,
+        YAMAHA podrá realizar correcciones y actualizaciones a esta Política de Privacidad. Por favor, verifique estos
+        términos regularmente para consultar los cambios que puedan haber existido y de qué manera le pueden afectar.
+      </li>
+    </ol>
+  </div>
+
+  <div class="grid grid-cols-2 gap-3 border-t border-slate-200 px-5 py-4 sm:px-6">
+    <button
+      id="privacy-cancel"
+      type="button"
+      class:list={[button, "border border-slate-300 bg-white text-slate-700 hover:bg-surface"]}
+    >
+      Cancelar
+    </button>
+    <button id="privacy-accept" type="button" class:list={[button, "bg-brand text-white hover:bg-brand-dark"]}>
+      Aceptar
+    </button>
+  </div>
+</dialog>

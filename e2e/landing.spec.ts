@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { E2E_PRIVACY_POLICY_URL, TOKEN, linkInfo, mockApi, submitted } from "./mock-api";
+import { TOKEN, linkInfo, mockApi, submitted } from "./mock-api";
 
 const NETWORK_ERROR_TEXT = "No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.";
 
@@ -38,11 +38,6 @@ test.describe("link válido", () => {
     const api = await mockApi(page, { submit: [submitted("ACEPTADO")] });
     await openValidLink(page);
 
-    // privacyPolicyUrl viene null: se usa la URL de build (TODO(PENDIENTE-14)).
-    for (const link of await page.getByRole("link", { name: /política de privacidad/ }).all()) {
-      await expect(link).toHaveAttribute("href", E2E_PRIVACY_POLICY_URL);
-      await expect(link).toHaveAttribute("target", "_blank");
-    }
     for (const checkbox of checkboxes(page)) {
       await expect(checkbox).not.toBeChecked();
       await checkbox.check();
@@ -69,6 +64,123 @@ test.describe("link válido", () => {
 
     await expectThanksPage(page);
     expect(api.submits).toEqual([{ personalDataConsent: false, marketingConsentYMDP: false, marketingConsentDEALER: false }]);
+  });
+});
+
+test.describe("política de privacidad en un pop-up (spec v1.5)", () => {
+  const POLICY_START = "Por medio del presente documento, YAMAHA MOTOR DEL PERÚ S.A";
+
+  function policyDialog(page: Page) {
+    return page.getByRole("dialog", { name: "Políticas de Privacidad" });
+  }
+
+  function policyButtons(page: Page) {
+    return page.getByRole("button", { name: "política de privacidad", exact: true });
+  }
+
+  test("se abre en la misma página; Aceptar marca solo el check de su botón y devuelve el foco", async ({ page }) => {
+    await mockApi(page, {});
+    await openValidLink(page);
+    const [personalData, yamaha, dealer] = checkboxes(page);
+
+    // Ya no hay enlaces que abran la política en otra pestaña: un botón por check.
+    await expect(page.getByRole("link", { name: /política de privacidad/ })).toHaveCount(0);
+    await expect(policyButtons(page)).toHaveCount(3);
+    await expect(policyDialog(page)).toBeHidden();
+
+    await policyButtons(page).nth(1).click();
+
+    const dialog = policyDialog(page);
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(POLICY_START);
+    // El clic en el botón no cambia el check por sí solo (está dentro del <label>).
+    await expect(yamaha!).not.toBeChecked();
+    // El texto se recorre con el teclado: la región desplazable recibe el foco.
+    await expect(page.locator("#privacy-dialog-body")).toBeFocused();
+    // Aceptar y Cancelar quedan a la vista sin desplazar el texto.
+    await expect(dialog.getByRole("button", { name: "Aceptar" })).toBeInViewport();
+    await expect(dialog.getByRole("button", { name: "Cancelar" })).toBeInViewport();
+    await expect(page.locator("html")).toHaveCSS("overflow", "hidden");
+
+    await dialog.getByRole("button", { name: "Aceptar" }).click();
+
+    await expect(dialog).toBeHidden();
+    await expect(yamaha!).toBeChecked();
+    await expect(personalData!).not.toBeChecked();
+    await expect(dealer!).not.toBeChecked();
+    await expect(policyButtons(page).nth(1)).toBeFocused();
+    await expect(page).toHaveURL(new RegExp(`\\?t=${TOKEN}$`));
+  });
+
+  test("Cancelar desmarca el check de su botón y Escape también", async ({ page }) => {
+    await mockApi(page, {});
+    await openValidLink(page);
+    const [personalData, yamaha, dealer] = checkboxes(page);
+    for (const checkbox of [personalData!, yamaha!, dealer!]) await checkbox.check();
+
+    await policyButtons(page).nth(0).click();
+    await policyDialog(page).getByRole("button", { name: "Cancelar" }).click();
+    await expect(policyDialog(page)).toBeHidden();
+    await expect(personalData!).not.toBeChecked();
+
+    await policyButtons(page).nth(2).click();
+    await expect(policyDialog(page)).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(policyDialog(page)).toBeHidden();
+    await expect(dealer!).not.toBeChecked();
+    await expect(policyButtons(page).nth(2)).toBeFocused();
+
+    // El otro check no cambia.
+    await expect(yamaha!).toBeChecked();
+  });
+
+  test("Aceptar en un check marcado lo deja marcado; Cancelar en uno desmarcado lo deja desmarcado", async ({ page }) => {
+    await mockApi(page, {});
+    await openValidLink(page);
+    const [personalData, yamaha] = checkboxes(page);
+    await personalData!.check();
+
+    await policyButtons(page).nth(0).click();
+    await policyDialog(page).getByRole("button", { name: "Aceptar" }).click();
+    await expect(personalData!).toBeChecked();
+
+    await policyButtons(page).nth(1).click();
+    await policyDialog(page).getByRole("button", { name: "Cancelar" }).click();
+    await expect(yamaha!).not.toBeChecked();
+  });
+
+  test("lo aceptado en el pop-up es lo que se envía", async ({ page }) => {
+    const api = await mockApi(page, { submit: [submitted("ACEPTADO")] });
+    await openValidLink(page);
+
+    await policyButtons(page).nth(0).click();
+    await policyDialog(page).getByRole("button", { name: "Aceptar" }).click();
+    await policyButtons(page).nth(2).click();
+    await policyDialog(page).getByRole("button", { name: "Aceptar" }).click();
+    await page.getByRole("button", { name: "ENVIAR" }).click();
+
+    await expectThanksPage(page);
+    expect(api.submits).toEqual([{ personalDataConsent: true, marketingConsentYMDP: false, marketingConsentDEALER: true }]);
+  });
+
+  test("el texto de la política conserva sus enlaces, que abren en una pestaña nueva", async ({ page }) => {
+    await mockApi(page, {});
+    await openValidLink(page);
+    await policyButtons(page).nth(0).click();
+
+    const dialog = policyDialog(page);
+    for (const name of ["Anexo 1", "Formulario", "Política de Privacidad del Canal de Denuncias"]) {
+      const link = dialog.getByRole("link", { name: new RegExp(`^${name} \\(se abre en una pestaña nueva\\)$`) });
+      await expect(link).toHaveAttribute("target", "_blank");
+      await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    }
+    await expect(dialog.getByRole("link", { name: "protecciondedatos@yamaha.com.pe" })).toHaveAttribute(
+      "href",
+      "mailto:protecciondedatos@yamaha.com.pe",
+    );
+    // Sin desplazamiento horizontal con el pop-up abierto.
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 });
 

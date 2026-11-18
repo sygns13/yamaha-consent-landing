@@ -10,3 +10,8 @@
   --color-danger: #b91c1c;
   --color-danger-surface: #fef2f2;
 }
+
+/* Con el pop-up de la política abierto (<dialog> modal), la página de fondo no se desplaza. */
+html:has(dialog[open]) {
+  overflow: hidden;
+}

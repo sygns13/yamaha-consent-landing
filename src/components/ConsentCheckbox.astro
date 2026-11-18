@@ -1,13 +1,13 @@
 ---
 /**
- * Checkbox de la landing con su <label> y el enlace a la política de privacidad.
+ * Checkbox de la landing con su <label> y el botón "política de privacidad".
  *
- * El slot es el texto que va antes del enlace y `suffix` lo que va después (p. ej. el punto final).
+ * El slot es el texto que va antes del botón y `suffix` lo que va después (p. ej. el punto final).
  * Los <strong> del slot se muestran en negrita y más oscuros, como "YAMAHA" y "DEALER" en el mockup.
  *
- * El enlace nace sin href: la URL se conoce recién al validar el enlace (GET), y el script de la página la pone
- * en cada [data-privacy-link]. Sin href se ve y se lee como texto normal.
- * TODO(PENDIENTE-14): URL real de la política de privacidad.
+ * "política de privacidad" abre el pop-up de la política (PrivacyPolicyDialog, spec v1.5) en la misma página: su
+ * [data-privacy-trigger] es el name del checkbox que marcan "Aceptar" y desmarcan "Cancelar" y Escape. El script de
+ * index.astro lo maneja; el clic en el botón no cambia el check por sí solo.
  */
 interface Props {
   /** Campo del body de submit (ConsentSubmitRequest). También es el id del checkbox. */
@@ -29,12 +29,12 @@ const { name, suffix = "" } = Astro.props;
     for={name}
     class="cursor-pointer text-base leading-relaxed text-slate-600 [&_strong]:font-bold [&_strong]:text-slate-900"
   >
-    <slot />{" "}<a
-      data-privacy-link
-      target="_blank"
-      rel="noopener noreferrer"
-      class="rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand [&[href]]:text-brand [&[href]]:underline [&[href]]:underline-offset-2 [&[href]]:hover:text-brand-dark"
-      >política de privacidad<span class="sr-only [a:not([href])_&]:hidden"> (se abre en una pestaña nueva)</span></a
+    <slot />{" "}<button
+      type="button"
+      data-privacy-trigger={name}
+      aria-haspopup="dialog"
+      class="cursor-pointer rounded-sm text-left text-brand underline underline-offset-2 hover:text-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-default"
+      >política de privacidad</button
     >{suffix}
   </label>
 </div>

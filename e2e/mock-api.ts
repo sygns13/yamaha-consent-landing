@@ -1,8 +1,7 @@
 import type { Page, Route } from "@playwright/test";
 
-/** URLs de build ficticias (playwright.config.ts): la API nunca se llama de verdad. */
+/** URL de build ficticia (playwright.config.ts): la API nunca se llama de verdad. */
 export const E2E_API_BASE_URL = "http://api.e2e.test";
-export const E2E_PRIVACY_POLICY_URL = "https://politica.e2e.test/privacidad";
 
 export const TOKEN = "token-e2e";
 

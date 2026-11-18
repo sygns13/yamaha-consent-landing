@@ -6,7 +6,7 @@ The workspace-level `../CLAUDE.md` covers the whole system (backend, business ru
 
 ## Current state
 
-- This repo is the customer-facing landing, module **M6** of `REQUERIMIENTOS_TECNICOS.md` (the spec, in Spanish, is the source of truth). M6 has not started: the pages are placeholders that only prove the scaffold works.
+- This repo is the customer-facing landing, module **M6** of `REQUERIMIENTOS_TECNICOS.md` (v1.5; the spec, in Spanish, is the source of truth). M6 is implemented; v1.5 (17/11/2026) replaced the new-tab privacy link with an in-page pop-up (see Page flow). The test VPS runs it from the commit the owner pushes.
 - `REQUERIMIENTOS_TECNICOS.md` here is a copy of `../requerimientos/REQUERIMIENTOS_TECNICOS.md`. After any spec change, keep all three copies identical (`cp` + `cmp`).
 - `docs/openapi.json` is a snapshot of the backend's OpenAPI schema. The landing only calls the two `/api/v1/public/consent-links/...` endpoints.
 - `assets/mockup-landing.png` is the visual reference. The `assets/` folder holds spec images and is not served (`public/` is the served static folder).
@@ -18,7 +18,7 @@ The workspace-level `../CLAUDE.md` covers the whole system (backend, business ru
 - All user-facing text is in Spanish. Code and identifiers stay in English (spec section 0).
 - Every call to the backend goes through `src/lib/api.ts` (`getConsentLink`, `submitConsent`). No `fetch` anywhere else. Its functions never throw: they return a result discriminated by `kind` (`VALID`/`SUBMITTED`, `EXPIRED`, `USED`, `NOT_FOUND`, `NETWORK_ERROR`), and its types mirror the schemas in `docs/openapi.json`.
 - Never use `window.alert` or `window.confirm`. Loading, errors and retries are shown inline in the page.
-- Anything marked `PENDIENTE-n` in the spec gets only its "mientras tanto" behavior plus a `TODO(PENDIENTE-n)` comment at that spot in the code. Today that means PENDIENTE-14 (privacy-policy URL from env).
+- Anything marked `PENDIENTE-n` in the spec gets only its "mientras tanto" behavior plus a `TODO(PENDIENTE-n)` comment at that spot in the code. Today that means PENDIENTE-14: the privacy-policy text is a dated copy in `PrivacyPolicyDialog.astro`.
 
 ## Commands
 
@@ -41,13 +41,14 @@ The workspace-level `../CLAUDE.md` covers the whole system (backend, business ru
 - Astro 7, `output: "static"`, TypeScript strict, **no UI framework**. The form logic lives in a `<script>` inside the page. Everything token-related happens client-side at runtime, since the site is static.
 - Tailwind CSS 4 via `@tailwindcss/vite` (no `tailwind.config`). Brand colors are `@theme` tokens in `src/styles/global.css` (`brand`, `brand-dark`, `surface`), taken from the mockup.
 - `src/components/` have no JavaScript of their own; the page script drives them through attributes:
-  - `ConsentCheckbox`: its `[data-privacy-link]` is rendered without `href`, and the page sets the URL after the GET. Without `href` it looks and reads as plain text.
+  - `ConsentCheckbox`: "política de privacidad" is a `<button data-privacy-trigger="{checkbox name}" aria-haspopup="dialog">` styled as a link, inside the `<label>` (the page script calls `preventDefault` so the click doesn't toggle the box).
+  - `PrivacyPolicyDialog`: native `<dialog id="privacy-dialog">` (rendered **outside** `#consent`, which starts `hidden`), title "Políticas de Privacidad", a focusable scroll region `#privacy-dialog-body` and the buttons `#privacy-cancel` / `#privacy-accept`. `global.css` locks the page scroll with `html:has(dialog[open])`.
   - `PrimaryButton`: `disabled` plus `aria-busy="true"` swaps the label for "Enviando...".
   - `Alert`: an outer live region (`role="alert"`, `aria-live="assertive"`) that is never hidden, around an inner box that gets `id`, `class` and `hidden`. Toggle the box's `hidden`; hide and show it again to re-announce. The loading indicator in `index.astro` follows the same pattern (a `role="status"` wrapper that also announces "Enviando..."). Live regions that are hidden themselves aren't announced reliably.
 - `src/layouts/BaseLayout.astro` holds the shared header ("YAMAHA" + "Privacidad y consentimiento"), `lang="es"` and `noindex`. All pages use it.
 - `src/pages/404.astro` is outside the spec: the owner approved it on 27/10/2026, and its text is a proposal. It builds to `dist/404.html`, which Firebase Hosting serves with status 404 for any unknown path. Without it, Firebase shows its generic page in English. Like the other pages, it has no JS, no buttons and no technical data.
-- Build-time env vars: `PUBLIC_API_BASE_URL` and `PUBLIC_PRIVACY_POLICY_URL` (PENDIENTE-14). They are typed in `src/env.d.ts`. Add any new `PUBLIC_*` var there and to `.env.example` and the README table.
-- Hosting: Firebase Hosting, `firebase.json` with `public: "dist"` and `cleanUrls: true`, so pages are `/gracias` and `/enlace-invalido` without `.html`. The security headers there include `Referrer-Policy: no-referrer`, which keeps the `?t=` token from leaking to the privacy-policy site. Don't remove it.
+- Build-time env var: `PUBLIC_API_BASE_URL`, typed in `src/env.d.ts`. `PUBLIC_PRIVACY_POLICY_URL` was removed in spec v1.5 (a leftover value in a `.env` or a VPS build arg is harmless). Add any new `PUBLIC_*` var to `src/env.d.ts`, `.env.example` and the README table.
+- Hosting: Firebase Hosting, `firebase.json` with `public: "dist"` and `cleanUrls: true`, so pages are `/gracias` and `/enlace-invalido` without `.html`. The security headers there include `Referrer-Policy: no-referrer`, which keeps the `?t=` token from leaking to external sites (e.g. the links inside the privacy policy). Don't remove it.
   - `"target": "landing"`: the site ID (M7 proposes `consent-landing`, but site IDs are globally unique) lives in `.firebaserc` via `firebase target:apply`. Without that mapping, deploy refuses to run.
   - Cache: page routes (`regex ^/[^.]*$`) get `no-cache`, so a new deploy (e.g. a new API URL inlined in the HTML) shows at once. Hashed `/_astro/**` gets one year `immutable`. The two rules must not overlap.
   - Production build vars go in `.env.production` (template `.env.production.example`, file gitignored). Vite loads it over `.env` in `astro build` only, not in `npm run dev`.
@@ -69,8 +70,7 @@ The workspace-level `../CLAUDE.md` covers the whole system (backend, business ru
   - Once the submit has a final outcome (`200`, `410`, `404`), `history.replaceState` removes `t` from the URL before redirecting. On a network error the token stays, so a reload re-validates the link.
 - Both calls abort after a fixed **15 s** (`AbortController`) and count as a network error. Owner's decision, not configurable. It was checked against the API: the public endpoints have no server-side limit below that (no DB `statement_timeout`/`lock_timeout`, Cloud Run default 300 s), and the API's 10 s timeouts (Twilio, KIZUNA) don't run inside these requests (KIZUNA runs after the response). A submit that times out may still commit; the retry then gets `410 USED`.
 - Redirects use `location.replace()`, so Back never returns to an already-submitted form. The page has a `<noscript>` message in Spanish.
-- Privacy-policy URL: `privacyPolicyUrl` from the GET; if `null`, `PUBLIC_PRIVACY_POLICY_URL`; if both are missing, the words "política de privacidad" without a link. `TODO(PENDIENTE-14)`.
-- Every "política de privacidad" link opens in a new tab (`target="_blank" rel="noopener noreferrer"`), so the form and its checkboxes stay as they were (owner's decision, 27/10/2026). There is no modal: the policy is an external URL, and a cross-origin page can't be framed reliably or scroll-tracked. The links don't change any checkbox.
+- Privacy policy (spec v1.5, owner's decision 17/11/2026, replacing the 27/10/2026 new-tab link): each "política de privacidad" opens a modal pop-up **in the same page** with the policy text and two buttons. **Aceptar** checks the box of the button that opened it; **Cancelar** and **Escape** (the `<dialog>` closes with an empty `returnValue`) uncheck it; other boxes don't change; focus returns to the button. The boxes can still be toggled directly (RN-01). The text is a verbatim copy (17/11/2026) of `https://www.yamaha-motor.com.pe/politicas-privacidad`, which can't be framed (`X-Frame-Options: SAMEORIGIN`): keep its wording, numbering (1, 2, 4, 5, 6) and links (those open in a new tab). `TODO(PENDIENTE-14)` there. The landing no longer uses `privacyPolicyUrl` from the GET (still typed in `api.ts`, it's the API contract); the backend keeps storing `PRIVACY_POLICY_URL` in the evidence.
 - `dealerName` (the `dealerName` KIZUNA sends, owner's decision 05/11/2026): shown in check 3; when `null` (KIZUNA didn't send it) the page keeps the literal "DEALER".
 - System font stack (Tailwind's default `font-sans`), no web fonts. Mobile-first; on desktop, a centered column with the header at full width.
 - The UI copy is fixed by the spec (M6 "Textos") and is in Spanish. Use it verbatim.

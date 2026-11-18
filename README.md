@@ -33,11 +33,23 @@ Las pruebas construyen el sitio con URLs ficticias en `dist-e2e/` (no tocan `dis
 | Variable | Descripción |
 |---|---|
 | `PUBLIC_API_BASE_URL` | URL base del backend (en Producción, la URL de Cloud Run) |
-| `PUBLIC_PRIVACY_POLICY_URL` | URL de la política de privacidad (PENDIENTE-14) |
 
 - Local: `.env` (copia de `.env.example`).
 - Producción: `.env.production` (copia de `.env.production.example`). `npm run build` lo carga por encima de `.env`; `npm run dev` no lo usa.
-- Las dos van incrustadas en el HTML publicado: nunca pongas secretos en ellas.
+- Va incrustada en el HTML publicado: nunca pongas secretos en ella.
+- `PUBLIC_PRIVACY_POLICY_URL` ya no se usa (spec v1.5): la política se muestra en un pop-up con su texto. Si quedó en un
+  `.env`, no afecta.
+
+## Política de privacidad (pop-up, spec v1.5)
+
+Cada "política de privacidad" de los checks abre, en la misma página, un pop-up con el texto de la política
+(`src/components/PrivacyPolicyDialog.astro`, `<dialog>` nativo) y dos botones: **Aceptar** marca el check de ese
+enlace; **Cancelar** y la tecla Escape lo desmarcan. Los checks se pueden seguir marcando directamente (RN-01).
+
+El texto es una copia tal cual de `https://www.yamaha-motor.com.pe/politicas-privacidad` del 17/11/2026, con su
+numeración y sus enlaces (que sí abren en una pestaña nueva). Esa página no se puede incrustar
+(`X-Frame-Options: SAMEORIGIN`). Si Yamaha cambia su política, actualiza el componente y `PRIVACY_POLICY_VERSION` del
+backend (⚠️ PENDIENTE-14).
 
 ## Despliegue en Firebase Hosting (manual)
 
@@ -61,7 +73,7 @@ El despliegue es manual y solo a Producción (spec M6 y M7). La landing va en Fi
 - Acceso al proyecto de Google Cloud de Yamaha con permisos de Firebase (rol Propietario o Administrador de Firebase).
 - El backend ya desplegado en Cloud Run (spec M7, pasos 1 a 5; ver `yamaha-consent-api/README.md`) y su URL a mano.
 - El dominio final definido (⚠️ PENDIENTE-15) y acceso al panel de Hostinger donde se administra su DNS.
-- La URL de la política de privacidad (⚠️ PENDIENTE-14).
+- El texto vigente de la política de privacidad, confirmado por Yamaha (⚠️ PENDIENTE-14; hoy, la copia del 17/11/2026).
 
 ### 1. Configuración inicial (una sola vez)
 
@@ -97,7 +109,6 @@ Completa `.env.production` (está en `.gitignore`):
 | Variable | Valor |
 |---|---|
 | `PUBLIC_API_BASE_URL` | URL de Cloud Run, con `https` y sin barra final: `gcloud run services describe consent-api --region=<REGION> --format="value(status.url)"` |
-| `PUBLIC_PRIVACY_POLICY_URL` | URL de la política de privacidad. Debe ser **la misma** que `PRIVACY_POLICY_URL` del backend, que es la que se guarda en la evidencia |
 
 Mientras exista `.env.production`, todo `npm run build` usa esos valores, también un `npm run preview` local. Ese preview llamaría a la API de Producción y CORS lo bloquearía. Para trabajar en local usa `npm run dev`.
 
