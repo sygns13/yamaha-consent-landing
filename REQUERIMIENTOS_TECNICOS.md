@@ -4,7 +4,7 @@
 |---|---|
 | Cliente | Yamaha – Perú |
 | Proveedor / Responsable técnico | Cristian Fernando Chávez Torres |
-| Versión del documento | 1.7 — 19/11/2026 (1.6 + la entrada de KIZUNA pasa de Apigee a Cloud Run IAM, especificada en `INTEGRACION_KIZUNA_CLOUD_RUN_IAM.spec.md`; solo referencias) · 1.6 — 18/11/2026 (1.5 + autenticación OAuth 2.0 con KIZUNA en ambos sentidos, especificada en `INTEGRACION_KIZUNA_OAUTH2.spec.md`; incorpora las decisiones de la sección 11) |
+| Versión del documento | 1.8 — 21/11/2026 (1.7 + la salida hacia KIZUNA (callback de M5) sigue la documentación de KIZUNA: Token API propio con password grant y Consent Response API, especificados en `INTEGRACION_KIZUNA_CONSENT_RESPONSE.spec.md`; cambian el payload del callback (`identifierId`, `marketingConsentDealer`), la respuesta esperada y el mock; `POST /api/v1/consents` acepta también `identifierId`; PENDIENTE-13 resuelto) · 1.7 — 19/11/2026 (1.6 + la entrada de KIZUNA pasa de Apigee a Cloud Run IAM, especificada en `INTEGRACION_KIZUNA_CLOUD_RUN_IAM.spec.md`; solo referencias) · 1.6 — 18/11/2026 (1.5 + autenticación OAuth 2.0 con KIZUNA en ambos sentidos, especificada en `INTEGRACION_KIZUNA_OAUTH2.spec.md`; incorpora las decisiones de la sección 11) |
 | Nube | Google Cloud (proyecto provisto por Yamaha). **Base de datos, backend y landing se despliegan en Google Cloud** |
 | Stack | Python + FastAPI · PostgreSQL (Cloud SQL) · Astro · Twilio WhatsApp |
 | Ambiente | Solo Producción (desarrollo y pruebas en local) |
@@ -300,6 +300,7 @@ Plataforma para gestionar digitalmente las conformidades de tratamiento de datos
 | `last_error` | text null | |
 | `last_attempt_at` / `sent_at` | timestamptz null | |
 | `claimed_at` | timestamptz null | Reclamo del envío (M5): se marca al reclamar la notificación (`SELECT ... FOR UPDATE SKIP LOCKED`) y se renueva en cada intento. Nulo = sin reclamar (migración `94fef8d63ecf`) |
+| `kizuna_status` | varchar(30) null | (v1.8) `Status` de la última respuesta de KIZUNA que lo trajo (`Accepted`, `Superseded`, `Invalid`, `Mismatch`, `NotFound`, `Error`), también en los fallos. Ver `INTEGRACION_KIZUNA_CONSENT_RESPONSE.spec.md`, 3.3 |
 
 ### Criterios de aceptación M1
 
@@ -333,7 +334,7 @@ Plataforma para gestionar digitalmente las conformidades de tratamiento de datos
 
 | Campo | Normalización | Validación |
 |---|---|---|
-| `IdentifierId` | — (se guarda tal cual) | Obligatorio, no vacío, máximo 100 |
+| `IdentifierId` | — (se guarda tal cual) | Obligatorio, no vacío, máximo 100. v1.8: también se acepta como `identifierId` (los dos con valores distintos → `422`); las respuestas siguen con `IdentifierId` (`INTEGRACION_KIZUNA_CONSENT_RESPONSE.spec.md`, 3.8) |
 | `customerId` | Trim, quitar espacios y guiones, mayúsculas | Obligatorio. Alfanumérico, máximo 20. *Alfanumérico* = letras A–Z, **Ñ** y dígitos 0–9 (sin tildes). Sin tipo de documento |
 | `customerName` | Trim, colapsar espacios múltiples, **MAYÚSCULAS conservando tildes y Ñ** (`str.upper()`) | Obligatorio, no vacío, máximo 250 |
 | `customerPhone` | Quitar todo lo que no sea dígito; si quedan 11 dígitos y empieza con `51`, quitar `51` | Obligatorio. Exactamente **9 dígitos** (formato `XXXXXXXXX`) |
@@ -580,7 +581,7 @@ Busca por `sha256(token)`.
 - **Reintentos:** 1 intento inicial + **hasta 3 reintentos** (`KIZUNA_CALLBACK_MAX_RETRIES=3`), con espera configurable entre intentos (`KIZUNA_CALLBACK_BACKOFF_SECONDS`, por ejemplo `5,30,120`) y timeout por intento (`KIZUNA_CALLBACK_TIMEOUT_SECONDS`).
   - La espera `KIZUNA_CALLBACK_BACKOFF_SECONDS[i]` va antes del reintento `i+1`. Si hay más reintentos que valores, se repite el último; sin valores, no hay espera. El header `Retry-After` de un `429` no se usa.
   - `KIZUNA_CALLBACK_TIMEOUT_SECONDS` limita el **intento completo** (no solo cada etapa de la conexión).
-- Se reintenta ante error de red, timeout o respuesta `5xx`/`429`. Ante otros `4xx` se marca `FALLIDO` sin reintentar **(propuesta)**. Éxito = cualquier `2xx` (KIZUNA no definió una respuesta; se espera `200`). Un `3xx` no se sigue y se marca `FALLIDO` sin reintentar.
+- Se reintenta ante error de red, timeout o respuesta `5xx`/`429`. Ante otros `4xx` se marca `FALLIDO` sin reintentar **(propuesta)**. Éxito = `2xx` según la respuesta de KIZUNA (v1.8: `Accepted` o `Superseded`; un `2xx` con `Received=false` es `FALLIDO`; tabla completa en `INTEGRACION_KIZUNA_CONSENT_RESPONSE.spec.md`, 3.3). Un `3xx` no se sigue y se marca `FALLIDO` sin reintentar.
 - Cada intento actualiza `kizuna_notifications` (`attempts`, `last_http_status`, `last_error`, `last_attempt_at`) con su propio commit: durante el envío y la espera entre intentos no queda ninguna transacción abierta. Si se agotan los reintentos → `FALLIDO` y log `ERROR`. El endpoint de consulta (M2) sigue siendo la vía de respaldo.
   - `last_error`: `HTTP <código>: <cuerpo>` (cuerpo truncado a 500 caracteres; puede traer el identificador del cliente, por eso **no** va al log) o el tipo de error de red o timeout. En un envío exitoso queda en `null`.
   - En el log solo van el `IdentifierId`, el ID de la notificación, el intento y el código HTTP: nunca el payload ni el valor de autenticación.
@@ -595,33 +596,40 @@ Busca por `sha256(token)`.
   - `FALLIDO` y `ENVIADO` no se reprocesan.
 - **Arranque:** con `KIZUNA_CALLBACK_ENABLED=false` → log `WARNING`. Con `true` y sin `KIZUNA_CALLBACK_URL`, o con `KIZUNA_CALLBACK_AUTH_HEADER` sin `KIZUNA_CALLBACK_AUTH_VALUE` → **la aplicación no arranca** (`KizunaConfigurationError`). Si `KIZUNA_CALLBACK_REPROCESS_AFTER_MINUTES` no supera la espera más larga entre intentos más el timeout → log `WARNING` (otra instancia podría reclamar una notificación a mitad de sus reintentos y KIZUNA la recibiría dos veces).
 
-### Contrato del callback (definido por KIZUNA) — ⚠️ PENDIENTE-13: URL y autenticación
+### Contrato del callback (definido por KIZUNA; v1.8)
 
-KIZUNA expone un endpoint REST que recibe por `HTTPS POST` el resultado final con este payload:
+Desde la v1.8 el contrato, la autenticación y la respuesta del callback se rigen por
+`INTEGRACION_KIZUNA_CONSENT_RESPONSE.spec.md` (documentación de KIZUNA del 21/11/2026). Resumen:
+
+- **Consent Response API** de KIZUNA: `POST <base>/api/consent/consent-response` (`<base>` de UAT: en ese spec, que
+  vive solo en el workspace; Producción: ⚠️ PENDIENTE-38 de ese spec), `Content-Type: application/json`,
+  `Authorization: Bearer <access_token>`. Un resultado por llamada (sin lotes). Cuerpo plano, sin `_request`:
+
 ```json
 {
-  "IdentifierId": "100002001",
+  "identifierId": "100002001",
   "customerId": "76299887",
   "dealerCode": "CL0001",
   "consentDateTime": "2026-11-02T13:35:00-05:00",
   "personalDataConsent": true,
   "marketingConsentYMDP": false,
-  "marketingConsentDEALER": false
+  "marketingConsentDealer": false
 }
 ```
+- Cambian solo dos nombres respecto de la v1.4: `IdentifierId` → `identifierId` y `marketingConsentDEALER` → `marketingConsentDealer`. Las respuestas de los endpoints de KIZUNA de la API (M2) **no** cambian.
 - `consentDateTime` = `responded_at` con la hora de Lima (`KIZUNA_TIMEZONE`, `-05:00`), sin fracciones de segundo.
 - Los checks **nunca van en `null`**: un check no marcado o en `null` va en `false`, y en `NO_ACEPTADO` (RN-01) el marketing va en `false`.
 - No lleva estado: el rechazo se reconoce por `personalDataConsent = false`.
-- Autenticación (v1.6): OAuth 2.0 client credentials contra el Entra ID de KIZUNA (modo `KIZUNA_CALLBACK_AUTH_MODE=oauth2`, ver `INTEGRACION_KIZUNA_OAUTH2.spec.md`). Se conserva el header configurable (`KIZUNA_CALLBACK_AUTH_HEADER` y `KIZUNA_CALLBACK_AUTH_VALUE`, modo `header`).
-- Falta: URL y respuesta esperada (PENDIENTE-27 de `INTEGRACION_KIZUNA_OAUTH2.spec.md`). **Mientras tanto**: cualquier `2xx` es éxito (se espera `200`).
+- **Autenticación:** el **Token API propio de KIZUNA** (`POST <base>/token`, OAuth 2.0 *password grant*: `grant_type=password`, `username`, `password`; token de 3600 s), con `KIZUNA_CALLBACK_AUTH_MODE=oauth2` y `KIZUNA_OAUTH_GRANT_TYPE=password`. Se conservan el grant `client_credentials` (`INTEGRACION_KIZUNA_OAUTH2.spec.md`, historial) y el header configurable (modo `header`).
+- **Respuesta de KIZUNA:** `{"IdentifierId", "Received", "Status", "Message"}`. `200 Accepted` y `200 Superseded` → `ENVIADO`; `400 Invalid`/`Mismatch`, `404 NotFound` y demás `4xx` → `FALLIDO` sin reintentar; `500`/`503` → reintento. El `Status` se guarda en `kizuna_notifications.kizuna_status`.
 
 ### Mock de KIZUNA (`mocks/kizuna_mock/`)
 
 - Mini aplicación FastAPI levantada con `docker compose` (servicio `kizuna-mock`, puerto `8081`).
-- `POST /kizuna/consent-result`: valida que el payload tenga la estructura del contrato (checks booleanos, sin `null`), lo registra en el log (enmascarando el `customerId`) y responde `200 {"received": true}`.
+- v1.8: imita las rutas reales de KIZUNA (`<base>` = `http://localhost:8081/ymdp_api`): `POST /ymdp_api/token` (password grant, credenciales `MOCK_USERNAME`/`MOCK_PASSWORD`) y `POST /ymdp_api/api/consent/consent-response`, que valida el contrato (checks booleanos, sin `null`), lo registra en el log (enmascarando el `customerId`) y responde con el cuerpo de KIZUNA (`MOCK_CONSENT_STATUS` fuerza `Accepted`, `Superseded`, `Mismatch`, `NotFound` o `Error`). Detalle en `INTEGRACION_KIZUNA_CONSENT_RESPONSE.spec.md`, 3.7. `POST /kizuna/consent-result` se conserva como alias (mismo contrato).
 - Para simular fallos y probar los reintentos: `MOCK_FAIL_TIMES=N` (responde `500` las primeras N veces) y `MOCK_RESPONSE_DELAY_SECONDS` (simula un timeout).
 - `GET /kizuna/received`: lista los payloads recibidos (útil en pruebas).
-- Valor local: `KIZUNA_CALLBACK_URL=http://localhost:8081/kizuna/consent-result` si la API corre en el host (`uv run uvicorn`), o `http://kizuna-mock:8081/kizuna/consent-result` si corre dentro de docker compose (el compose lo fija).
+- Valor local: `KIZUNA_CALLBACK_URL=http://localhost:8081/ymdp_api/api/consent/consent-response` si la API corre en el host (`uv run uvicorn`), o `http://kizuna-mock:8081/ymdp_api/api/consent/consent-response` si corre dentro de docker compose (el compose lo fija).
 - `DELETE /kizuna/received`: reinicia el contador y la lista de payloads (útil entre pruebas).
 - El mock **no se despliega** en Producción.
 
@@ -782,16 +790,16 @@ KIZUNA expone un endpoint REST que recibe por `HTTPS POST` el resultado final co
 | `TWILIO_TIMEOUT_SECONDS` | `10` | Timeout de cada envío a Twilio (el envío ocurre dentro de la transacción de `POST /api/v1/consents`) |
 | `PHONE_COUNTRY_PREFIX` | `51` | Se antepone al enviar |
 | `KIZUNA_CALLBACK_ENABLED` | `false` | Enciende o apaga el envío final a KIZUNA. Con `false` no sale ninguna petición |
-| `KIZUNA_CALLBACK_URL` | `http://kizuna-mock:8081/kizuna/consent-result` (local) | Endpoint real: ⚠️ PENDIENTE-13 |
-| `KIZUNA_CALLBACK_AUTH_HEADER` | ⚠️ PENDIENTE-13 | |
-| `KIZUNA_CALLBACK_AUTH_VALUE` | *(secreto)* | |
+| `KIZUNA_CALLBACK_URL` | `http://localhost:8081/ymdp_api/api/consent/consent-response` (local, mock) | Consent Response API de KIZUNA (`<base>/api/consent/consent-response`; v1.8) |
+| `KIZUNA_CALLBACK_AUTH_HEADER` | `""` | Solo modo `header`; vacío en Producción (modo `oauth2`) |
+| `KIZUNA_CALLBACK_AUTH_VALUE` | *(secreto)* | Solo modo `header` |
 | `KIZUNA_CALLBACK_MAX_RETRIES` | `3` | Reintentos después del primer intento |
 | `KIZUNA_CALLBACK_BACKOFF_SECONDS` | `5,30,120` | Espera antes de cada reintento |
-| `KIZUNA_CALLBACK_TIMEOUT_SECONDS` | `10` | Límite de cada intento completo |
+| `KIZUNA_CALLBACK_TIMEOUT_SECONDS` | `10` | Límite de cada intento completo (y de cada pedido de token). En Google Cloud: `60` (v1.8, lectura acordada con KIZUNA) |
 | `KIZUNA_CALLBACK_REPROCESS_AFTER_MINUTES` | `10` | Al arrancar se reenvían las notificaciones `PENDIENTE` sin reclamar y las que llevan más de N minutos sin intento (reclamo vencido) |
 | `KIZUNA_TIMEZONE` | `America/Lima` | Zona horaria de las fechas hacia KIZUNA (`consentDateTime`, fechas de las consultas) y de `requestDateTime` sin offset |
 
-Las variables de autenticación OAuth 2.0 del callback (`KIZUNA_CALLBACK_AUTH_MODE`, `KIZUNA_OAUTH_*`) están en la sección 5 de `INTEGRACION_KIZUNA_OAUTH2.spec.md`.
+Las variables de autenticación del callback (`KIZUNA_CALLBACK_AUTH_MODE`, `KIZUNA_OAUTH_*`) están en la sección 5 de `INTEGRACION_KIZUNA_OAUTH2.spec.md` y, desde la v1.8, en la sección 4 de `INTEGRACION_KIZUNA_CONSENT_RESPONSE.spec.md` (`KIZUNA_OAUTH_GRANT_TYPE`, `KIZUNA_OAUTH_USERNAME` y el secreto `KIZUNA_OAUTH_PASSWORD`).
 
 ### Frontend (build)
 
@@ -815,7 +823,7 @@ Los puntos resueltos se conservan con su ID para mantener la trazabilidad (detal
 | PENDIENTE-10 | Teléfonos extranjeros | Con la regla de 9 dígitos sin prefijo, solo se soportan móviles de Perú. ¿Es correcto? | Se rechaza (422) lo que no tenga 9 dígitos |
 | PENDIENTE-11 | Nombre visible del remitente | Nombre que verá el cliente en WhatsApp (el mockup muestra "YAMAHA***") | — |
 | PENDIENTE-12 | Swagger en Producción | ¿Se deja `/docs` expuesto? | Controlado por `DOCS_ENABLED` |
-| PENDIENTE-13 | Callback a KIZUNA | URL y respuesta esperada (el payload ya lo definió KIZUNA, M5). La autenticación quedó definida el 18/11/2026 (OAuth 2.0, `INTEGRACION_KIZUNA_OAUTH2.spec.md`); lo abierto sigue allí como PENDIENTE-27 | Envío al **mock**; éxito = `2xx`; `KIZUNA_CALLBACK_ENABLED=false` |
+| ~~PENDIENTE-13~~ | Callback a KIZUNA | **Resuelto el 21/11/2026 (v1.8)** por la documentación de KIZUNA: URL, autenticación (Token API, password grant), cuerpo y respuesta en `INTEGRACION_KIZUNA_CONSENT_RESPONSE.spec.md`. Quedan abiertos allí las credenciales de UAT (PENDIENTE-35) y los valores de Producción de KIZUNA (PENDIENTE-38) | — |
 | PENDIENTE-14 | Política de privacidad | URL y versión vigentes | Variables de entorno del backend; la landing muestra la copia del 17/11/2026 de la página oficial (M6, v1.5) |
 | PENDIENTE-15 | Dominio de la landing | Dominio o subdominio final (probablemente provisto desde Hostinger). **Se requiere antes de crear la plantilla de WhatsApp**, porque el botón usa un dominio fijo | `LANDING_BASE_URL` y `CORS_ALLOWED_ORIGINS` configurables |
 | PENDIENTE-16 | Expiración sin respuesta | Si el enlace vence sin respuesta, ¿se notifica algo a KIZUNA? | No se notifica; el estado queda `PENDIENTE` |
@@ -909,3 +917,4 @@ Los puntos resueltos se conservan con su ID para mantener la trazabilidad (detal
 | 17/11/2026 | M6 · Política de privacidad en un pop-up (v1.5) | Cada "política de privacidad" abre un pop-up en la misma página con el texto copiado tal cual de la página oficial de Yamaha (17/11/2026; no se puede incrustar por `X-Frame-Options: SAMEORIGIN`). Aceptar marca el check de ese enlace; Cancelar y Escape lo desmarcan. Reemplaza la decisión del 27/10/2026 (pestaña nueva). La landing deja de usar `PUBLIC_PRIVACY_POLICY_URL` y el `privacyPolicyUrl` del `GET` (que la API sigue devolviendo); la evidencia sigue guardando `PRIVACY_POLICY_URL`. |
 | 18/11/2026 | Autenticación con KIZUNA (v1.6) | OAuth 2.0 client credentials en ambos sentidos, especificado en `requerimientos/INTEGRACION_KIZUNA_OAUTH2.spec.md` (v1.1). Entrada: Apigee emite y valida los tokens de KIZUNA y llama a la API con la API Key de §2.1. Salida: la API obtiene el token del Entra ID de KIZUNA. No cambia el contrato de datos v1.4. Para la autenticación entre KIZUNA y la API manda ese documento; para todo lo demás, este. |
 | 19/11/2026 | Entrada de KIZUNA (v1.7) | Apigee se descarta por costo. La entrada usa Cloud Run IAM + cuenta de servicio (`requerimientos/INTEGRACION_KIZUNA_CLOUD_RUN_IAM.spec.md`): la misma imagen en dos servicios de Cloud Run (público y privado para KIZUNA). La salida sigue en `INTEGRACION_KIZUNA_OAUTH2.spec.md`. No cambia el contrato de datos v1.4 |
+| 21/11/2026 | Salida hacia KIZUNA (v1.8) | KIZUNA documentó su Token API (OAuth 2.0 password grant) y su Consent Response API (`kizuna_docs/`). El callback de M5 cambia dos nombres (`identifierId`, `marketingConsentDealer`), interpreta la respuesta de KIZUNA (`kizuna_notifications.kizuna_status`) y se autentica con el Token API. `POST /api/v1/consents` acepta también `identifierId` (las respuestas siguen con `IdentifierId`). Especificado en `requerimientos/INTEGRACION_KIZUNA_CONSENT_RESPONSE.spec.md`, que manda para el callback y su autenticación. Resuelve PENDIENTE-13 |
